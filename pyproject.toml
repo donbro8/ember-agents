@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ember-bio-agents"
+version = "0.1.0"
+description = "LangGraph agents and orchestration for Ember Bio"
+requires-python = ">=3.11"
+dependencies = [
+    "ember-bio-shared==0.1.0",
+    "ember-bio-data==0.1.0",
+    "langgraph>=0.2",
+    "langchain-google-vertexai>=1.0",
+    "pydantic>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.4",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ember_agents"]
+
+[tool.uv.sources]
+ember-bio-shared = { path = "../ember-shared", editable = true }
+ember-bio-data = { path = "../ember-data", editable = true }
