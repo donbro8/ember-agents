@@ -29,3 +29,6 @@ packages = ["src/ember_agents"]
 [tool.uv.sources]
 ember-bio-shared = { path = "../ember-shared", editable = true }
 ember-bio-data = { path = "../ember-data", editable = true }
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
