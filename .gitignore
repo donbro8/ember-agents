@@ -10,3 +10,11 @@ dist/
 .mypy_cache/
 *.egg
 build/
+
+# Governance artifacts (SMA-managed)
+.claude/
+.contracts/
+.tasks/
+docs/architecture.md
+docs/tech-spec.md
+docs/detail-spec/

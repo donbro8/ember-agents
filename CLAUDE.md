@@ -30,3 +30,13 @@ uv run pytest --cov
 - Async-first — use pytest-asyncio for async test fixtures
 - Depends on ember-shared and ember-data
 - Lint with ruff: `uv run ruff check src/ tests/`
+
+## Agent Routing (3 agents)
+
+| Role | Agent File | Tier Class | When to Use |
+|---|---|---|---|
+| module-architect | `.claude/agents/module-architect.md` | architect | Architectural design, task refinement, agent pattern decisions |
+| implementer | `.claude/agents/implementer.md` | implementer | Code implementation, writing tests, running lint/tests |
+| reviewer | `.claude/agents/reviewer.md` | reviewer | Code review, quality checks, standards compliance |
+
+Selection rule: SMA dispatches the appropriate agent based on task type. Module-architect for design tasks, implementer for coding tasks, reviewer for review tasks.
