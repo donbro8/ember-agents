@@ -8,20 +8,27 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       id-token: write
     steps:
       - uses: actions/checkout@v4
 
       - uses: astral-sh/setup-uv@v3
 
-      - name: Install dependencies
-        run: uv sync
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
 
       - name: Build package
         run: uv build
 
-      - name: Publish to PyPI
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
-        run: uvx twine upload dist/*
+      - name: Install twine
+        run: uv tool install twine[keyring] --with keyrings.google-artifactregistry-auth
+
+      - name: Publish to Artifact Registry
+        run: |
+          uv tool run twine upload \
+            --repository-url https://${{ vars.GCP_REGION }}-python.pkg.dev/${{ vars.GCP_PROJECT_ID }}/ember-bio-python/ \
+            dist/*

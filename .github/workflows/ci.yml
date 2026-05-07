@@ -9,13 +9,24 @@ on:
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
       - uses: astral-sh/setup-uv@v3
 
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
       - name: Install dependencies
-        run: uv sync --extra dev
+        run: |
+          uv sync --extra dev --no-sources \
+            --extra-index-url "https://oauth2accesstoken:$(gcloud auth print-access-token)@${{ vars.GCP_REGION }}-python.pkg.dev/${{ vars.GCP_PROJECT_ID }}/ember-bio-python/simple/"
 
       - name: Ruff check
         run: uv run ruff check .
