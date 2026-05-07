@@ -5,7 +5,6 @@ from __future__ import annotations
 from ember_data.models.patent import Patent
 from ember_data.seed import load_mab_reference
 from ember_data.seed.schema import MabEntry
-from ember_shared import settings
 
 
 def load_mab_seed() -> list[MabEntry]:

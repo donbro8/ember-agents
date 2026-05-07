@@ -482,6 +482,7 @@ dependencies = [
     { name = "ember-bio-shared" },
     { name = "google-cloud-aiplatform" },
     { name = "google-cloud-bigquery" },
+    { name = "httpx" },
     { name = "pydantic" },
 ]
 
@@ -490,6 +491,7 @@ requires-dist = [
     { name = "ember-bio-shared", editable = "../ember-shared" },
     { name = "google-cloud-aiplatform", specifier = ">=1.40" },
     { name = "google-cloud-bigquery", specifier = ">=3.0" },
+    { name = "httpx", specifier = ">=0.27" },
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0" },
