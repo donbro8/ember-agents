@@ -554,10 +554,9 @@ wheels = [
 
 [[package]]
 name = "ember-bio-agents"
-version = "0.1.2"
+version = "0.1.4"
 source = { editable = "." }
 dependencies = [
-    { name = "chromadb" },
     { name = "ember-bio-data" },
     { name = "ember-bio-shared" },
     { name = "langchain-google-genai" },
@@ -567,15 +566,20 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
+    { name = "chromadb" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "ruff" },
 ]
+semantic = [
+    { name = "chromadb" },
+]
 
 [package.metadata]
 requires-dist = [
-    { name = "chromadb", specifier = ">=0.4" },
+    { name = "chromadb", marker = "extra == 'dev'", specifier = ">=0.4" },
+    { name = "chromadb", marker = "extra == 'semantic'", specifier = ">=0.4" },
     { name = "ember-bio-data", editable = "../ember-data" },
     { name = "ember-bio-shared", editable = "../ember-shared" },
     { name = "langchain-google-genai", specifier = ">=2.0" },
@@ -586,11 +590,11 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.4" },
 ]
-provides-extras = ["dev"]
+provides-extras = ["semantic", "dev"]
 
 [[package]]
 name = "ember-bio-data"
-version = "0.1.0"
+version = "0.1.4"
 source = { editable = "../ember-data" }
 dependencies = [
     { name = "ember-bio-shared" },
@@ -615,7 +619,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "ember-bio-shared"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "../ember-shared" }
 dependencies = [
     { name = "pydantic" },

@@ -457,7 +457,7 @@ def _signals_to_minimal_spec(signals: RawSignals) -> Any:
         patent_expiry_window: object = None
         approval_date_range: object = None
         jurisdictions: list = field(default_factory=list)
-        max_results: int = 500
+        max_results: int = 50
         domains: list = field(
             default_factory=lambda: ["trials", "patents", "articles", "candidates"]
         )
