@@ -17,7 +17,7 @@ class _FakeStructuredLLM:
         return self.response
 
 
-class _FakeChatVertexAI:
+class _FakeChatGoogleGenerativeAI:
     def __init__(self, response: RawSignals, calls: list[dict]) -> None:
         self.response = response
         self.calls = calls
@@ -63,8 +63,8 @@ async def test_intent_extractor_uses_structured_output(monkeypatch) -> None:
         commercial=["US"],
     )
     calls: list[dict] = []
-    fake_chat = _FakeChatVertexAI(response, calls)
-    monkeypatch.setattr("ember_agents.search.interpret.ChatVertexAI", fake_chat)
+    fake_chat = _FakeChatGoogleGenerativeAI(response, calls)
+    monkeypatch.setattr("ember_agents.search.interpret.ChatGoogleGenerativeAI", fake_chat)
 
     extractor = IntentExtractor(model_name="test-model")
     signals = await extractor.extract(
@@ -73,7 +73,7 @@ async def test_intent_extractor_uses_structured_output(monkeypatch) -> None:
     )
 
     assert signals == response
-    assert calls[0] == {"model_name": "test-model"}
+    assert calls[0]["model"] == "test-model"
     assert calls[1] == {"schema": RawSignals}
 
 
@@ -81,8 +81,8 @@ async def test_intent_extractor_uses_structured_output(monkeypatch) -> None:
 async def test_prompt_includes_temporal_mapping_rules(monkeypatch) -> None:
     response = RawSignals()
     calls: list[dict] = []
-    fake_chat = _FakeChatVertexAI(response, calls)
-    monkeypatch.setattr("ember_agents.search.interpret.ChatVertexAI", fake_chat)
+    fake_chat = _FakeChatGoogleGenerativeAI(response, calls)
+    monkeypatch.setattr("ember_agents.search.interpret.ChatGoogleGenerativeAI", fake_chat)
 
     extractor = IntentExtractor()
     llm = extractor._llm

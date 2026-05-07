@@ -10,8 +10,13 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
-from langchain_google_vertexai import ChatVertexAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
+
+try:
+    from ember_shared import settings as _settings
+except ImportError:  # pragma: no cover
+    _settings = None
 
 _SYSTEM_PROMPT_TEMPLATE = """\
 You are a pharmaceutical-intelligence signal extractor.
@@ -74,9 +79,12 @@ class RawSignals(BaseModel):
 class IntentExtractor:
     """Extracts raw search signals from natural-language queries using LLM structured output."""
 
-    def __init__(self, model_name: str = "gemini-1.5-flash") -> None:
+    def __init__(self, model_name: str = "gemini-2.5-flash") -> None:
         self._model_name = model_name
-        self._llm: Any = ChatVertexAI(model_name=model_name).with_structured_output(
+        genai_kwargs: dict[str, Any] = {"model": model_name}
+        if _settings is not None and _settings.GOOGLE_API_KEY:
+            genai_kwargs["google_api_key"] = _settings.GOOGLE_API_KEY
+        self._llm: Any = ChatGoogleGenerativeAI(**genai_kwargs).with_structured_output(
             RawSignals
         )
 
