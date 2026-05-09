@@ -1,12 +1,12 @@
 """Search pipeline package for dynamic drug discovery search.
 
-Exports the full pipeline:
+Exports the pipeline components:
   Interpret → Classify → Gate → Fetch → Match
 
-and the top-level SearchAgent orchestrator.
+The unified agent is EmberAgent (ember_agents.agent), not SearchAgent.
+SearchAgent is retained as internal infrastructure but not publicly exported.
 """
 
-from ember_agents.search.agent import SearchAgent
 from ember_agents.search.classify import ClassificationOrchestrator
 from ember_agents.search.fetch import FetchOrchestrator
 from ember_agents.search.gate import SearchGate
@@ -18,6 +18,5 @@ __all__ = [
     "FetchOrchestrator",
     "IntentExtractor",
     "MatchScorer",
-    "SearchAgent",
     "SearchGate",
 ]
