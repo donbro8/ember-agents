@@ -92,6 +92,45 @@ def _candidate_label(sc: ScoredCandidate) -> str:
     return " / ".join(parts) if parts else f"Candidate {getattr(cand, 'id', '?')}"
 
 
+def _resolve_dimension_value(
+    dim: str, candidate: Any, signals: RawSignals | None
+) -> str:
+    """Resolve the actual matched value for a dimension.
+
+    Tries candidate attributes first, then falls back to query signals.
+    Returns the dimension name as a last resort.
+    """
+    dim_lower = dim.lower()
+
+    if dim_lower == "target":
+        # Try candidate's target object
+        target = getattr(candidate, "target", None)
+        if target is not None:
+            for attr in ("label", "name", "identifier", "gene_name", "value"):
+                val = getattr(target, attr, None)
+                if val:
+                    return str(val)
+        # Fall back to query signals
+        if signals and signals.target:
+            return signals.target[0]
+
+    elif dim_lower == "indication":
+        # Fall back to query signals
+        if signals and signals.indication:
+            return signals.indication[0]
+
+    elif dim_lower == "modality":
+        if signals and signals.modality:
+            return signals.modality[0]
+
+    # Try drug_name for any dimension as a generic fallback
+    drug = getattr(candidate, "drug_name", None)
+    if dim_lower == "drug" and drug:
+        return str(drug)
+
+    return dim
+
+
 @register_agent("search")
 class SearchAgent(Agent):
     """Orchestrates the Interpret → Classify → Gate → Fetch → Match pipeline.
@@ -291,7 +330,7 @@ class SearchAgent(Agent):
         # ----------------------------------------------------------------
         yield f"_Found **{len(scored_candidates)}** candidates matching your query. Results are ranked by how closely each candidate matches your search criteria (target, indication, modality) and the depth of supporting evidence (trials, patents, articles)._\n\n"
 
-        async for fragment in self._render_results(scored_candidates, query):
+        async for fragment in self._render_results(scored_candidates, query, signals=signals):
             yield fragment
 
     # ------------------------------------------------------------------
@@ -323,7 +362,10 @@ class SearchAgent(Agent):
         return "\n".join(parts)
 
     async def _render_results(
-        self, scored: list[ScoredCandidate], query: str
+        self,
+        scored: list[ScoredCandidate],
+        query: str,
+        signals: RawSignals | None = None,
     ) -> AsyncGenerator[str, None]:
         """Yield streaming markdown for the ranked results.
 
@@ -341,7 +383,7 @@ class SearchAgent(Agent):
             yield f"## Ranked Candidates ({total} total)\n\n"
 
         for sc in show:
-            async for fragment in self._render_candidate(sc):
+            async for fragment in self._render_candidate(sc, signals=signals):
                 yield fragment
 
         if remaining > 0:
@@ -355,31 +397,13 @@ class SearchAgent(Agent):
 
         yield "---\n\n"
 
-        # Sources summary
-        yield "## Contributing Sources\n\n"
-        seen_sources: set[str] = set()
-        for sc in scored:
-            for prov in list(getattr(sc.candidate, "contributing_sources", []) or []):
-                name = _extract_source_name(prov)
-                url = _extract_source_url(prov)
-                key = name
-                if key not in seen_sources:
-                    seen_sources.add(key)
-                    if url:
-                        yield f"- [{name}]({url})\n"
-                    else:
-                        yield f"- {name}\n"
-
-        if not seen_sources:
-            yield "_No source provenance recorded._\n"
-
-        yield "\n"
-
         # Synthesis summary
         yield "## Synthesis Summary\n\n"
         yield self._build_synthesis_summary(scored, query)
 
-    async def _render_candidate(self, sc: ScoredCandidate) -> AsyncGenerator[str, None]:
+    async def _render_candidate(
+        self, sc: ScoredCandidate, *, signals: RawSignals | None = None
+    ) -> AsyncGenerator[str, None]:
         """Yield a compact, human-readable markdown block for a single scored candidate."""
         label = _candidate_label(sc)
         yield f"### {sc.rank}. {label}\n"
@@ -387,9 +411,12 @@ class SearchAgent(Agent):
         # Confidence label
         confidence = _confidence_label(sc.overall_score)
 
-        # Matched dimensions with values and checkmarks
+        # Matched dimensions with actual values and checkmarks
         dims = list(getattr(sc.candidate, "matched_dimensions", []) or [])
-        dim_parts: list[str] = [f"{dim.capitalize()}: {dim} \u2713" for dim in dims]
+        dim_parts: list[str] = []
+        for dim in dims:
+            value = _resolve_dimension_value(dim, sc.candidate, signals)
+            dim_parts.append(f"{dim.capitalize()}: {value} \u2713")
 
         # Evidence counts (only non-zero)
         n_trials = len(list(getattr(sc.candidate, "trials", []) or []))
@@ -507,6 +534,13 @@ class SearchAgent(Agent):
             lines.append(
                 f"Data was drawn from {len(all_sources)} unique source(s): "
                 f"{', '.join(sorted(all_sources))}."
+            )
+
+        # Low confidence advisory
+        if top.overall_score < 0.3:
+            lines.append(
+                "Results with low confidence may not be directly relevant to "
+                "your query. Try refining your search with more specific terms."
             )
 
         return " ".join(lines) + "\n"

@@ -39,12 +39,21 @@ class TestDiscoveryAgent:
     """Tests for DiscoveryAgent.run()."""
 
     async def test_run_with_results(self, mock_bq: MagicMock):
-        """run() yields markdown containing patent and FDA event data."""
+        """run() yields markdown containing patent and FDA drug label data."""
         mock_bq.search_patents.return_value = [
-            {"title": "Gene Therapy Patent", "publication_date": "2024-01-15"},
+            {
+                "title": "Gene Therapy Patent",
+                "filing_date": "20240115",
+                "country_code_from_pub": "US",
+                "publication_number": "US-12345-A1",
+            },
         ]
         mock_bq.query_fda_drug_events.return_value = [
-            {"reaction": "Headache", "severity": "Mild"},
+            {
+                "openfda_brand_name": "Keytruda",
+                "openfda_generic_name": "pembrolizumab",
+                "openfda_manufacturer_name": "Merck",
+            },
         ]
 
         agent = DiscoveryAgent()
@@ -54,10 +63,13 @@ class TestDiscoveryAgent:
 
         output = "".join(chunks)
         assert "# Discovery Report: CRISPR" in output
-        assert "Gene Therapy Patent" in output
-        assert "2024-01-15" in output
-        assert "Headache" in output
-        assert "Mild" in output
+        assert "[**Gene Therapy Patent**](https://patents.google.com/patent/US-12345-A1)" in output
+        assert "US" in output
+        assert "filed 20240115" in output
+        assert "## FDA Drug Labels" in output
+        assert "Keytruda" in output
+        assert "pembrolizumab" in output
+        assert "Merck" in output
         assert "## Sources" in output
 
     async def test_run_empty_results(self, mock_bq: MagicMock):
@@ -72,4 +84,4 @@ class TestDiscoveryAgent:
 
         output = "".join(chunks)
         assert "No patent results found" in output
-        assert "No FDA adverse-event results found" in output
+        assert "No FDA drug label results found" in output

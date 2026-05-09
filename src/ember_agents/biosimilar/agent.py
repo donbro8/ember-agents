@@ -33,6 +33,9 @@ def _format_expiry(expiry: date, jurisdiction: str = "") -> str:
     """Format a patent expiry date as a relative description with jurisdiction."""
     today = date.today()
     if expiry < today:
+        if expiry.year == today.year:
+            month_name = expiry.strftime("%b")
+            return f"Expired ({month_name} {expiry.year})"
         return f"Expired ({expiry.year})"
     years = (expiry - today).days / 365.25
     if years < 1:
@@ -98,6 +101,7 @@ class BiosimilarAgent(Agent):
             yield "- **Stage 3 (patent lookup):** skipped — BigQuery unavailable\n\n"
 
         # --- Ranked candidate table ---
+        _TABLE_LIMIT = 25
         yield "## Ranked Candidates\n\n"
         if candidates:
             yield (
@@ -105,7 +109,7 @@ class BiosimilarAgent(Agent):
                 "| Biosimilars |\n"
             )
             yield "|------|------|----------|------------|---------|-----------------|-------------|\n"
-            for c in candidates:
+            for c in candidates[:_TABLE_LIMIT]:
                 biosim_count = c.competitive_landscape.count
                 rev = _format_revenue(c.annual_revenue_usd_millions)
                 exp = _format_expiry(c.earliest_expiry, c.earliest_expiry_jurisdiction)
@@ -115,6 +119,10 @@ class BiosimilarAgent(Agent):
                     f"| {exp} "
                     f"| {biosim_count} |\n"
                 )
+            total = len(candidates)
+            if total > _TABLE_LIMIT:
+                remaining = total - _TABLE_LIMIT
+                yield f"\n_Showing top {_TABLE_LIMIT} of {total} candidates. {remaining} additional candidates not shown._\n"
         else:
             yield "_No candidates passed the filter criteria._\n"
         yield "\n"
@@ -122,17 +130,46 @@ class BiosimilarAgent(Agent):
         # --- Key Takeaways ---
         if candidates:
             yield "## Key Takeaways\n\n"
-            top = candidates[:5]
-            for c in top:
+
+            # Top 2 overall by revenue (already sorted by rank)
+            top_overall = candidates[:2]
+            seen_names: set[str] = {c.drug_name for c in top_overall}
+            seen_categories: set[str] = {c.category for c in top_overall}
+
+            # Top candidate per remaining category
+            top_by_category: list = []
+            for c in candidates:
+                if c.category not in seen_categories and c.drug_name not in seen_names:
+                    top_by_category.append(c)
+                    seen_categories.add(c.category)
+                    seen_names.add(c.drug_name)
+                    if len(top_overall) + len(top_by_category) >= 7:
+                        break
+
+            def _render_takeaway(c):  # noqa: ANN001, ANN202
                 rev = _format_revenue(c.annual_revenue_usd_millions)
                 exp = _format_expiry(c.earliest_expiry, c.earliest_expiry_jurisdiction)
-                yield f"- **{c.drug_name}** ({c.category}) — {rev} revenue, expiry: {exp}\n"
+                line = f"- **{c.drug_name}** ({c.category}) — {rev} revenue, expiry: {exp}\n"
+                if c.patent_expiries:
+                    parts = [f"{j}: {d.year}" for j, d in sorted(c.patent_expiries.items())]
+                    line += f"  Patent expiries: {' | '.join(parts)}\n"
+                return line
+
+            yield "**Top overall:**\n"
+            for c in top_overall:
+                yield _render_takeaway(c)
+
+            if top_by_category:
+                yield "\n**Top by category:**\n"
+                for c in top_by_category:
+                    yield _render_takeaway(c)
+
             yield "\n"
 
-        # --- Patent details ---
-        yield "## Patent Details\n\n"
+        # --- Patent details (only if any candidates have patent data) ---
         candidates_with_patents = [c for c in candidates if c.patents]
         if candidates_with_patents:
+            yield "## Patent Details\n\n"
             for c in candidates_with_patents[:10]:
                 yield f"### {c.drug_name}\n\n"
                 for pat in c.patents:
@@ -145,5 +182,3 @@ class BiosimilarAgent(Agent):
                     parts = [f"{j}: {d.year}" for j, d in sorted(c.patent_expiries.items())]
                     yield f"  - Jurisdictions: {' | '.join(parts)}\n"
                 yield "\n"
-        else:
-            yield "_No patent data retrieved._\n"

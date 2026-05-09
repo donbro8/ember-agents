@@ -554,7 +554,7 @@ wheels = [
 
 [[package]]
 name = "ember-bio-agents"
-version = "0.1.4"
+version = "0.1.6"
 source = { editable = "." }
 dependencies = [
     { name = "ember-bio-data" },
@@ -594,7 +594,7 @@ provides-extras = ["semantic", "dev"]
 
 [[package]]
 name = "ember-bio-data"
-version = "0.1.4"
+version = "0.1.5"
 source = { editable = "../ember-data" }
 dependencies = [
     { name = "ember-bio-shared" },

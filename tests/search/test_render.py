@@ -189,10 +189,24 @@ class TestRenderCandidate:
         assert "**Match: Weak**" in output
 
     async def test_matched_dimensions_with_checkmark(self, agent: SearchAgent):
-        sc = _make_scored(overall=0.5, drug_name="X", dims=["target", "indication"])
+        sc = _make_scored(overall=0.5, drug_name="X", target_label="EGFR", dims=["target", "indication"])
         output = await _collect_candidate(agent, sc)
-        assert "Target: target \u2713" in output
+        # Should show actual target value from candidate, not dimension name
+        assert "Target: EGFR \u2713" in output
+        # indication falls back to dim name without signals
         assert "Indication: indication \u2713" in output
+
+    async def test_matched_dimensions_with_signals(self, agent: SearchAgent):
+        """When signals are provided, dimension values come from query signals."""
+        from ember_agents.search.interpret import RawSignals
+        sc = _make_scored(overall=0.5, drug_name="X", dims=["target", "indication"])
+        signals = RawSignals(target=["EGFR"], indication=["oncology"], modality=[], commercial=[])
+        parts: list[str] = []
+        async for fragment in agent._render_candidate(sc, signals=signals):
+            parts.append(fragment)
+        output = "".join(parts)
+        assert "Target: EGFR \u2713" in output
+        assert "Indication: oncology \u2713" in output
 
     async def test_evidence_counts_only_nonzero(self, agent: SearchAgent):
         sc = _make_scored(overall=0.5, drug_name="X", n_trials=3, n_articles=1)
@@ -283,10 +297,11 @@ class TestRenderResultsCap:
         output = await _collect_results(agent, scored)
         assert "1 additional candidate scored below" in output
 
-    async def test_sources_and_synthesis_sections_preserved(self, agent: SearchAgent):
+    async def test_synthesis_section_preserved_no_contributing_sources(self, agent: SearchAgent):
         scored = [_make_scored(rank=1, overall=0.5, drug_name="X")]
         output = await _collect_results(agent, scored)
-        assert "## Contributing Sources" in output
+        # Contributing Sources section was removed (redundant with per-candidate links)
+        assert "## Contributing Sources" not in output
         assert "## Synthesis Summary" in output
 
     async def test_exactly_10_no_cap_message(self, agent: SearchAgent):
@@ -294,3 +309,29 @@ class TestRenderResultsCap:
         output = await _collect_results(agent, scored)
         assert "10 total" in output
         assert "additional candidate" not in output
+
+
+# ---------------------------------------------------------------------------
+# Synthesis summary: low-confidence advisory
+# ---------------------------------------------------------------------------
+
+
+class TestSynthesisSummaryLowConfidence:
+    @pytest.fixture()
+    def agent(self) -> SearchAgent:
+        return SearchAgent.__new__(SearchAgent)
+
+    async def test_low_confidence_advisory_when_top_below_03(self, agent: SearchAgent):
+        scored = [_make_scored(rank=1, overall=0.20, drug_name="WeakDrug")]
+        output = await _collect_results(agent, scored)
+        assert "Results with low confidence may not be directly relevant" in output
+
+    async def test_no_advisory_when_top_above_03(self, agent: SearchAgent):
+        scored = [_make_scored(rank=1, overall=0.50, drug_name="StrongDrug")]
+        output = await _collect_results(agent, scored)
+        assert "Results with low confidence may not be directly relevant" not in output
+
+    async def test_boundary_at_03(self, agent: SearchAgent):
+        scored = [_make_scored(rank=1, overall=0.30, drug_name="BorderDrug")]
+        output = await _collect_results(agent, scored)
+        assert "Results with low confidence may not be directly relevant" not in output
