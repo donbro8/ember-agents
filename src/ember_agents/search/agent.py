@@ -454,7 +454,8 @@ class SearchAgent(Agent):
         # Cap at 3 links
         links = links[:3]
         if links:
-            yield f"**Sources:** {' \u00b7 '.join(links)}\n"
+            separator = " \u00b7 "
+            yield f"**Sources:** {separator.join(links)}\n"
 
         # Synthesis summary on the candidate itself (if any)
         synthesis = getattr(sc.candidate, "synthesis_summary", None)
