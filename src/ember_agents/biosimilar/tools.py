@@ -3,17 +3,21 @@
 from __future__ import annotations
 
 from ember_data.models.patent import Patent
-from ember_data.seed import load_mab_reference
-from ember_data.seed.schema import MabEntry
+from ember_data.seed import load_biologic_reference
+from ember_data.seed.schema import BiologicEntry
 
 
-def load_mab_seed() -> list[MabEntry]:
-    """Load the curated mAb reference seed dataset.
+def load_biologic_seed() -> list[BiologicEntry]:
+    """Load the curated biologic reference seed dataset.
 
     Returns:
-        List of validated MabEntry instances.
+        List of validated BiologicEntry instances.
     """
-    return load_mab_reference()
+    return load_biologic_reference()
+
+
+# Backward-compatible alias
+load_mab_seed = load_biologic_seed
 
 
 def search_drug_patents(drug_name: str, originator: str, bq_client) -> list[Patent]:

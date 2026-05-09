@@ -503,12 +503,24 @@ def _score_evidence(candidate: Any) -> float:
 
 
 def _compute_overall(semantic: float, structured: float, evidence: float) -> float:
-    """Weighted combination of the three scoring signals."""
-    return (
-        _WEIGHT_SEMANTIC * semantic
-        + _WEIGHT_STRUCTURED * structured
-        + _WEIGHT_EVIDENCE * evidence
-    )
+    """Weighted combination of the three scoring signals.
+
+    When ChromaDB is unavailable the semantic signal is always 0, so we
+    rebalance the remaining two signals to avoid wasting 40 % of the
+    score range.
+    """
+    if _CHROMA_AVAILABLE:
+        return (
+            _WEIGHT_SEMANTIC * semantic
+            + _WEIGHT_STRUCTURED * structured
+            + _WEIGHT_EVIDENCE * evidence
+        )
+    return 0.65 * structured + 0.35 * evidence
+
+
+def semantic_scoring_available() -> bool:
+    """Return True if ChromaDB semantic scoring is active."""
+    return _CHROMA_AVAILABLE
 
 
 # ---------------------------------------------------------------------------

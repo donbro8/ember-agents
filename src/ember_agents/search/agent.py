@@ -20,7 +20,8 @@ from ember_agents.search.classify import ClassificationOrchestrator, Disambiguat
 from ember_agents.search.fetch import FetchOrchestrator
 from ember_agents.search.gate import GateResult, NarrowingRequest, SearchGate
 from ember_agents.search.interpret import IntentExtractor, RawSignals
-from ember_agents.search.match import MatchScorer, ScoredCandidate
+from ember_agents.search.match import MatchScorer, ScoredCandidate, semantic_scoring_available
+from ember_agents.search.urls import drug_label_url, patent_url, pubmed_url, trial_url, uniprot_url
 
 # Maximum number of disambiguation/narrowing loops before giving up.
 _MAX_GATE_LOOPS = 5
@@ -55,6 +56,18 @@ def _extract_source_name(provenance: Any) -> str:
 def _extract_source_url(provenance: Any) -> str | None:
     """Extract the URL from a provenance object, if available."""
     return getattr(provenance, "source_url", None) or None
+
+
+_MAX_RENDERED_CANDIDATES = 10
+
+
+def _confidence_label(overall_score: float) -> str:
+    """Return a human-readable confidence label for the given overall score."""
+    if overall_score >= 0.5:
+        return "Strong"
+    if overall_score >= 0.2:
+        return "Moderate"
+    return "Weak"
 
 
 def _candidate_label(sc: ScoredCandidate) -> str:
@@ -171,6 +184,9 @@ class SearchAgent(Agent):
 
         yield self._render_signals(signals)
 
+        if not semantic_scoring_available():
+            yield "_Semantic similarity scoring is not available in this environment. Results are ranked by structural match and evidence depth._\n\n"
+
         # ----------------------------------------------------------------
         # Stage 2: Classify (optional — requires resolvers)
         # ----------------------------------------------------------------
@@ -273,6 +289,8 @@ class SearchAgent(Agent):
         # ----------------------------------------------------------------
         # Stage 6: Render results
         # ----------------------------------------------------------------
+        yield f"_Found **{len(scored_candidates)}** candidates matching your query. Results are ranked by how closely each candidate matches your search criteria (target, indication, modality) and the depth of supporting evidence (trials, patents, articles)._\n\n"
+
         async for fragment in self._render_results(scored_candidates, query):
             yield fragment
 
@@ -307,12 +325,33 @@ class SearchAgent(Agent):
     async def _render_results(
         self, scored: list[ScoredCandidate], query: str
     ) -> AsyncGenerator[str, None]:
-        """Yield streaming markdown for the ranked results."""
-        yield f"## Ranked Candidates ({len(scored)} total)\n\n"
+        """Yield streaming markdown for the ranked results.
 
-        for sc in scored:
+        Renders at most the top ``_MAX_RENDERED_CANDIDATES`` candidates.  When
+        more candidates exist, a summary line indicates how many were omitted
+        and the score threshold of the last rendered candidate.
+        """
+        total = len(scored)
+        show = scored[:_MAX_RENDERED_CANDIDATES]
+        remaining = total - len(show)
+
+        if remaining > 0:
+            yield f"## Ranked Candidates (showing top {len(show)} of {total})\n\n"
+        else:
+            yield f"## Ranked Candidates ({total} total)\n\n"
+
+        for sc in show:
             async for fragment in self._render_candidate(sc):
                 yield fragment
+
+        if remaining > 0:
+            threshold = show[-1].overall_score if show else 0.0
+            yield "---\n\n"
+            yield (
+                f"_{remaining} additional candidate{'s' if remaining != 1 else ''} "
+                f"scored below {threshold:.2f}. "
+                f"Results ranked by structural match and evidence depth._\n\n"
+            )
 
         yield "---\n\n"
 
@@ -341,47 +380,88 @@ class SearchAgent(Agent):
         yield self._build_synthesis_summary(scored, query)
 
     async def _render_candidate(self, sc: ScoredCandidate) -> AsyncGenerator[str, None]:
-        """Yield the markdown block for a single scored candidate."""
+        """Yield a compact, human-readable markdown block for a single scored candidate."""
         label = _candidate_label(sc)
-        yield f"### {sc.rank}. {label}\n\n"
+        yield f"### {sc.rank}. {label}\n"
 
-        # Scores table
-        yield (
-            f"| Signal | Score |\n"
-            f"|--------|-------|\n"
-            f"| Overall | **{sc.overall_score:.3f}** |\n"
-            f"| Semantic | {sc.semantic_score:.3f} |\n"
-            f"| Structured | {sc.structured_score:.3f} |\n"
-            f"| Evidence | {sc.evidence_score:.3f} |\n\n"
-        )
+        # Confidence label
+        confidence = _confidence_label(sc.overall_score)
 
-        # Matched dimensions
+        # Matched dimensions with values and checkmarks
         dims = list(getattr(sc.candidate, "matched_dimensions", []) or [])
-        if dims:
-            yield f"**Matched dimensions:** {', '.join(dims)}\n\n"
+        dim_parts: list[str] = [f"{dim.capitalize()}: {dim} \u2713" for dim in dims]
 
-        # Evidence counts
+        # Evidence counts (only non-zero)
         n_trials = len(list(getattr(sc.candidate, "trials", []) or []))
         n_patents = len(list(getattr(sc.candidate, "patents", []) or []))
         n_articles = len(list(getattr(sc.candidate, "articles", []) or []))
-        if n_trials or n_patents or n_articles:
-            yield (
-                f"**Evidence:** {n_trials} trial(s), "
-                f"{n_patents} patent(s), "
-                f"{n_articles} article(s)\n\n"
-            )
+        evidence_parts: list[str] = []
+        if n_trials:
+            evidence_parts.append(f"{n_trials} trial{'s' if n_trials != 1 else ''}")
+        if n_patents:
+            evidence_parts.append(f"{n_patents} patent{'s' if n_patents != 1 else ''}")
+        if n_articles:
+            evidence_parts.append(f"{n_articles} article{'s' if n_articles != 1 else ''}")
 
-        # Per-candidate sources (inline, abbreviated)
-        sources = list(getattr(sc.candidate, "contributing_sources", []) or [])
-        if sources:
-            source_names = [_extract_source_name(p) for p in sources[:5]]
-            unique_names = list(dict.fromkeys(source_names))
-            yield f"**Sources:** {', '.join(unique_names)}\n\n"
+        # Build the one-liner
+        detail_parts: list[str] = dim_parts
+        if evidence_parts:
+            detail_parts = detail_parts + [", ".join(evidence_parts)]
+        detail_str = " | ".join(detail_parts) if detail_parts else ""
+
+        match_line = f"**Match: {confidence}** ({sc.overall_score:.2f})"
+        if detail_str:
+            match_line += f" \u2014 {detail_str}"
+        yield f"{match_line}\n"
+
+        # Per-candidate verified source links
+        links: list[str] = []
+
+        # Check trials for NCT IDs
+        for trial in list(getattr(sc.candidate, "trials", []) or [])[:1]:
+            nct = getattr(trial, "nct_id", None)
+            url = trial_url(nct) if nct else None
+            if url:
+                links.append(f"[ClinicalTrials.gov]({url})")
+
+        # Check articles for PMIDs
+        for article in list(getattr(sc.candidate, "articles", []) or [])[:1]:
+            pmid = getattr(article, "pmid", None)
+            doi = getattr(article, "doi", None)
+            url = pubmed_url(pmid, doi)
+            if url:
+                links.append(f"[PubMed]({url})")
+
+        # Check target for UniProt
+        target = getattr(sc.candidate, "target", None)
+        if target:
+            acc = (
+                getattr(target, "uniprot_id", None)
+                or getattr(target, "accession", None)
+                or getattr(target, "identifier", None)
+            )
+            url = uniprot_url(acc) if acc else None
+            if url:
+                links.append(f"[UniProt]({url})")
+
+        # Check patents
+        for pat in list(getattr(sc.candidate, "patents", []) or [])[:1]:
+            pub_num = getattr(pat, "publication_number", None)
+            url = patent_url(pub_num) if pub_num else None
+            if url:
+                links.append(f"[Google Patents]({url})")
+
+        # Cap at 3 links
+        links = links[:3]
+        if links:
+            yield f"**Sources:** {' \u00b7 '.join(links)}\n"
 
         # Synthesis summary on the candidate itself (if any)
         synthesis = getattr(sc.candidate, "synthesis_summary", None)
         if synthesis:
-            yield f"> {synthesis}\n\n"
+            yield f"\n> {synthesis}\n"
+
+        yield "\n"
 
     def _build_synthesis_summary(
         self, scored: list[ScoredCandidate], query: str

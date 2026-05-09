@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ember_data.seed.schema import MabEntry
+from ember_data.seed.schema import BiologicEntry
 from ember_agents.biosimilar.pipeline import (
     stage1_hard_filter,
     stage2_enrich,
@@ -19,8 +19,8 @@ from ember_agents.biosimilar.pipeline import (
 # Fixtures
 # ---------------------------------------------------------------------------
 
-def _make_entry(**kwargs) -> MabEntry:
-    """Build a minimal MabEntry with sensible defaults."""
+def _make_entry(**kwargs) -> BiologicEntry:
+    """Build a minimal BiologicEntry with sensible defaults."""
     defaults = dict(
         drug_name="TestDrug",
         originator="TestCo",
@@ -36,11 +36,11 @@ def _make_entry(**kwargs) -> MabEntry:
         biosimilar_competitors=[],
     )
     defaults.update(kwargs)
-    return MabEntry(**defaults)
+    return BiologicEntry(**defaults)
 
 
 @pytest.fixture()
-def seed_entries() -> list[MabEntry]:
+def seed_entries() -> list[BiologicEntry]:
     """A mix of entries that should pass and fail stage1 filters."""
     return [
         # PASS: mammalian, high revenue, US expiry within cutoff
@@ -104,6 +104,7 @@ class TestStage1HardFilter:
             entries=seed_entries,
             patent_expiry_cutoff=date(2028, 12, 31),
             min_revenue_millions=1.0,
+            cell_line_class="mammalian",
         )
         names = {c.drug_name for c in result}
         assert "DrugA" in names
@@ -114,6 +115,7 @@ class TestStage1HardFilter:
             entries=seed_entries,
             patent_expiry_cutoff=date(2028, 12, 31),
             min_revenue_millions=1.0,
+            cell_line_class="mammalian",
         )
         names = {c.drug_name for c in result}
         assert "DrugC" not in names  # wrong cell_line_class
@@ -148,18 +150,32 @@ class TestStage1HardFilter:
         assert len(result) == 1
         assert result[0].drug_name == "B"
 
+    def test_cell_line_class_none_skips_filter(self):
+        """When cell_line_class is None, entries of any class pass."""
+        mammalian = _make_entry(drug_name="M", cell_line_class="mammalian", patent_expiry_us=date(2025, 1, 1))
+        microbial = _make_entry(drug_name="B", cell_line_class="microbial", patent_expiry_us=date(2025, 1, 1))
+        insect = _make_entry(drug_name="I", cell_line_class="insect", patent_expiry_us=date(2025, 1, 1))
+        result = stage1_hard_filter(
+            [mammalian, microbial, insect],
+            date(2028, 12, 31),
+            min_revenue_millions=1.0,
+            cell_line_class=None,
+        )
+        names = {e.drug_name for e in result}
+        assert names == {"M", "B", "I"}
+
     def test_jurisdiction_filter_us_only(self):
         # Entry has only EU expiry within cutoff
         entry = _make_entry(
             patent_expiry_us=None,
             patent_expiry_eu=date(2026, 1, 1),
         )
-        # Restricting to "us" only should exclude it (no US expiry data)
+        # Restricting to "US" only should exclude it (no US expiry data)
         result = stage1_hard_filter(
             [entry],
             date(2028, 12, 31),
             min_revenue_millions=1.0,
-            jurisdictions=["us"],
+            jurisdictions=["US"],
         )
         assert result == []
 
@@ -172,9 +188,31 @@ class TestStage1HardFilter:
             [entry],
             date(2028, 12, 31),
             min_revenue_millions=1.0,
-            jurisdictions=["eu"],
+            jurisdictions=["EU"],
         )
         assert len(result) == 1
+
+    def test_multi_region_jp_cn_in_patent_expiries(self):
+        """Entries with JP/CN in patent_expiries are correctly filtered."""
+        entry = _make_entry(
+            drug_name="AsiaOnly",
+            patent_expiry_us=None,
+            patent_expiry_eu=None,
+            patent_expiries={"JP": date(2026, 3, 1), "CN": date(2027, 6, 1)},
+        )
+        # Default jurisdictions (US, EU) should exclude this entry
+        result = stage1_hard_filter(
+            [entry], date(2028, 12, 31), min_revenue_millions=1.0
+        )
+        assert result == []
+
+        # But requesting JP should include it
+        result = stage1_hard_filter(
+            [entry], date(2028, 12, 31), min_revenue_millions=1.0,
+            jurisdictions=["JP"],
+        )
+        assert len(result) == 1
+        assert result[0].drug_name == "AsiaOnly"
 
 
 # ---------------------------------------------------------------------------
@@ -184,7 +222,7 @@ class TestStage1HardFilter:
 class TestStage2Enrich:
     """Tests for stage2_enrich."""
 
-    def _make_entries_for_enrichment(self) -> list[MabEntry]:
+    def _make_entries_for_enrichment(self) -> list[BiologicEntry]:
         return [
             _make_entry(
                 drug_name="Low",
@@ -263,6 +301,56 @@ class TestStage2Enrich:
         entries = self._make_entries_for_enrichment()
         candidates = stage2_enrich(entries)
         assert all(isinstance(c, BiosimilarCandidate) for c in candidates)
+
+    def test_earliest_expiry_jurisdiction_set(self):
+        entries = self._make_entries_for_enrichment()
+        candidates = stage2_enrich(entries)
+        # "High" has only US expiry
+        high = next(c for c in candidates if c.drug_name == "High")
+        assert high.earliest_expiry_jurisdiction == "US"
+        # "Low" has US 2026-01-01 and EU 2027-01-01; earliest is US
+        low = next(c for c in candidates if c.drug_name == "Low")
+        assert low.earliest_expiry_jurisdiction == "US"
+        assert low.earliest_expiry == date(2026, 1, 1)
+
+    def test_multi_region_earliest_expiry_from_jp(self):
+        """JP patent earlier than US/EU should be selected as earliest."""
+        entry = _make_entry(
+            drug_name="MultiRegion",
+            annual_revenue_usd_millions=2000.0,
+            patent_expiry_us=date(2028, 1, 1),
+            patent_expiry_eu=date(2029, 1, 1),
+            patent_expiries={
+                "US": date(2028, 1, 1),
+                "EU": date(2029, 1, 1),
+                "JP": date(2025, 6, 1),
+                "CN": date(2027, 3, 1),
+            },
+        )
+        candidates = stage2_enrich([entry])
+        assert len(candidates) == 1
+        c = candidates[0]
+        assert c.earliest_expiry == date(2025, 6, 1)
+        assert c.earliest_expiry_jurisdiction == "JP"
+        assert c.patent_expiries == {
+            "US": date(2028, 1, 1),
+            "EU": date(2029, 1, 1),
+            "JP": date(2025, 6, 1),
+            "CN": date(2027, 3, 1),
+        }
+
+    def test_patent_expiries_dict_populated(self):
+        """Enriched candidates carry the full patent_expiries dict."""
+        entry = _make_entry(
+            drug_name="DictCheck",
+            annual_revenue_usd_millions=500.0,
+            patent_expiry_us=date(2026, 1, 1),
+            patent_expiry_eu=date(2027, 1, 1),
+        )
+        candidates = stage2_enrich([entry])
+        assert len(candidates) == 1
+        assert "US" in candidates[0].patent_expiries
+        assert "EU" in candidates[0].patent_expiries
 
 
 # ---------------------------------------------------------------------------

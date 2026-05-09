@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from ember_agents.discovery.agent import DiscoveryAgent
+from ember_agents.discovery.tools import _extract_drug_name
 
 
 @pytest.fixture()
@@ -16,6 +17,22 @@ def mock_bq():
         client = MagicMock()
         mock_cls.return_value = client
         yield client
+
+
+class TestExtractDrugName:
+    """Tests for _extract_drug_name helper."""
+
+    def test_extract_drug_name_from_question(self):
+        assert _extract_drug_name("What patents exist for pembrolizumab?") == "pembrolizumab"
+
+    def test_extract_drug_name_from_imperative(self):
+        assert _extract_drug_name("Find FDA adverse events for adalimumab") == "adalimumab"
+
+    def test_extract_drug_name_passthrough(self):
+        assert _extract_drug_name("pembrolizumab") == "pembrolizumab"
+
+    def test_extract_drug_name_complex(self):
+        assert _extract_drug_name("Show me patents and FDA adverse events for bevacizumab") == "bevacizumab"
 
 
 class TestDiscoveryAgent:

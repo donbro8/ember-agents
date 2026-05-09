@@ -20,6 +20,7 @@ from ember_agents.search.match import (
     _WEIGHT_EVIDENCE,
     _WEIGHT_SEMANTIC,
     _WEIGHT_STRUCTURED,
+    semantic_scoring_available,
 )
 
 
@@ -685,3 +686,33 @@ async def test_end_to_end_scoring_single_candidate() -> None:
     assert result[0].rank == 1
     assert result[0].candidate is cand
     assert result[0].overall_score >= 0.0
+
+
+# ---------------------------------------------------------------------------
+# Dynamic weight rebalancing when ChromaDB is unavailable
+# ---------------------------------------------------------------------------
+
+
+def test_compute_overall_rebalanced_without_chromadb(monkeypatch: Any) -> None:
+    """When ChromaDB is unavailable, weights should rebalance to 0.65/0.35."""
+    monkeypatch.setattr("ember_agents.search.match._CHROMA_AVAILABLE", False)
+    result = _compute_overall(0.0, 0.5, 0.3)
+    expected = 0.65 * 0.5 + 0.35 * 0.3  # 0.43
+    assert abs(result - expected) < 1e-9
+
+
+def test_compute_overall_original_with_chromadb(monkeypatch: Any) -> None:
+    """When ChromaDB is available, original 0.4/0.4/0.2 weights apply."""
+    monkeypatch.setattr("ember_agents.search.match._CHROMA_AVAILABLE", True)
+    result = _compute_overall(0.8, 0.5, 0.3)
+    expected = 0.4 * 0.8 + 0.4 * 0.5 + 0.2 * 0.3  # 0.58
+    assert abs(result - expected) < 1e-9
+
+
+def test_semantic_scoring_available(monkeypatch: Any) -> None:
+    """semantic_scoring_available() should reflect _CHROMA_AVAILABLE."""
+    monkeypatch.setattr("ember_agents.search.match._CHROMA_AVAILABLE", True)
+    assert semantic_scoring_available() is True
+
+    monkeypatch.setattr("ember_agents.search.match._CHROMA_AVAILABLE", False)
+    assert semantic_scoring_available() is False

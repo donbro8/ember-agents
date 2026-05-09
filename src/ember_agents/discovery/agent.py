@@ -5,7 +5,11 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator
 
 from ember_agents.base import Agent
-from ember_agents.discovery.tools import search_fda_events, search_patents
+from ember_agents.discovery.tools import (
+    _extract_drug_name,
+    search_fda_events,
+    search_patents,
+)
 from ember_agents.factory import register_agent
 
 
@@ -22,10 +26,16 @@ class DiscoveryAgent(Agent):
         Yields:
             Markdown-formatted sections: header, patents, FDA events, sources.
         """
+        extracted_term = _extract_drug_name(query)
         yield f"# Discovery Report: {query}\n\n"
+        yield f"> Searching for: **{extracted_term}**\n\n"
 
         # --- Patents ---
-        patents = search_patents(query)
+        try:
+            patents = search_patents(query)
+        except Exception as exc:
+            patents = []
+            yield f"> **Warning:** Could not query patents: {exc}\n\n"
         yield "## Patents\n\n"
         if patents:
             for pat in patents:
@@ -37,7 +47,11 @@ class DiscoveryAgent(Agent):
         yield "\n"
 
         # --- FDA Adverse Events ---
-        fda_events = search_fda_events(query)
+        try:
+            fda_events = search_fda_events(query)
+        except Exception as exc:
+            fda_events = []
+            yield f"> **Warning:** Could not query FDA adverse events: {exc}\n\n"
         yield "## FDA Adverse Events\n\n"
         if fda_events:
             for evt in fda_events:
