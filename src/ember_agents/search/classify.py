@@ -8,8 +8,9 @@ must surface to the user before retrying.
 
 from __future__ import annotations
 
+import inspect
 from dataclasses import dataclass, field
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from ember_agents.search.interpret import RawSignals
 
@@ -89,7 +90,48 @@ class ResolverResult(Protocol):
 
 
 class Resolver(Protocol):
-    async def resolve(self, term: str) -> ResolverResult: ...
+    def resolve(self, term: str) -> Any: ...
+
+
+class _CandidateAdapter:
+    """Adapts a ResolvedTerm (identifier/label/confidence) to ResolverCandidate (id/label/confidence)."""
+
+    __slots__ = ("_term",)
+
+    def __init__(self, term: Any) -> None:
+        self._term = term
+
+    @property
+    def id(self) -> str:
+        return getattr(self._term, "id", None) or getattr(self._term, "identifier", "")
+
+    @property
+    def label(self) -> str:
+        return getattr(self._term, "label", "")
+
+    @property
+    def confidence(self) -> float:
+        return getattr(self._term, "confidence", 0.0)
+
+
+@dataclass
+class _ListAsResult:
+    """Wraps a plain list as a ResolverResult-compatible object."""
+    candidates: list
+
+
+async def _resolve(resolver: Any, term: str) -> Any:
+    """Call resolver.resolve(), handling both sync and async implementations.
+
+    Also wraps plain list returns into a ResolverResult-compatible object
+    since ember-data resolvers return list[ResolvedTerm] directly.
+    """
+    result = resolver.resolve(term)
+    if inspect.isawaitable(result):
+        result = await result
+    if isinstance(result, list):
+        return _ListAsResult(candidates=[_CandidateAdapter(c) for c in result])
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -231,7 +273,7 @@ class ClassificationOrchestrator:
 
         # --- target (uniprot) ---
         for term in signals.target:
-            result = await self._uniprot_resolver.resolve(term)
+            result = await _resolve(self._uniprot_resolver, term)
             candidates = result.candidates
             if not candidates:
                 continue
@@ -260,7 +302,7 @@ class ClassificationOrchestrator:
 
         # --- indication (mesh) ---
         for term in signals.indication:
-            result = await self._mesh_resolver.resolve(term)
+            result = await _resolve(self._mesh_resolver, term)
             candidates = result.candidates
             if not candidates:
                 continue
@@ -290,7 +332,7 @@ class ClassificationOrchestrator:
 
         # --- indication (atc) ---
         for term in signals.indication:
-            result = await self._atc_resolver.resolve(term)
+            result = await _resolve(self._atc_resolver, term)
             candidates = result.candidates
             if not candidates:
                 continue
@@ -319,7 +361,7 @@ class ClassificationOrchestrator:
 
         # --- modality ---
         for term in signals.modality:
-            result = await self._modality_resolver.resolve(term)
+            result = await _resolve(self._modality_resolver, term)
             candidates = result.candidates
             if not candidates:
                 continue

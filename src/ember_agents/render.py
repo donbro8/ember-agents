@@ -86,14 +86,36 @@ class ResultRenderer:
 
         return "\n".join(lines)
 
-    def _render_results(self, results: list[Any]) -> str:
-        """Render the ranked results section."""
+    def _render_results(self, results: list[Any], max_results: int = 20) -> str:
+        """Render the ranked results section.
+
+        Filters out results with no identifying information (no display_label,
+        drug_name, or target) and limits output to *max_results*.
+        """
         if not results:
             return "## Results\n\n_No results found._"
 
-        lines: list[str] = [f"## Results ({len(results)} found)"]
+        # Filter: keep only results with at least one identifying field
+        displayable = [
+            r for r in results
+            if (getattr(r, "display_label", None)
+                or getattr(r, "drug_name", None)
+                or getattr(r, "target", None))
+        ]
 
-        for i, result in enumerate(results, start=1):
+        total = len(results)
+        shown = displayable[:max_results]
+
+        if not shown:
+            return f"## Results\n\n_{total} results found but none had identifying information._"
+
+        header = f"## Results ({len(shown)} shown"
+        if total > len(shown):
+            header += f", {total} total"
+        header += ")"
+        lines: list[str] = [header]
+
+        for i, result in enumerate(shown, start=1):
             label = getattr(result, "display_label", None) or getattr(result, "drug_name", None) or "Unknown"
             overall_score = getattr(result, "overall_score", None)
             score_str = f" — score: {overall_score:.3f}" if overall_score is not None else ""
