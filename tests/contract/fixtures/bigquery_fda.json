@@ -1,0 +1,47 @@
+[
+  {
+    "application_number": "BLA103772",
+    "brand_name": "HUMIRA",
+    "generic_name": "adalimumab",
+    "manufacturer_name": "ABBVIE INC",
+    "product_type": "BIOLOGIC",
+    "route": "SUBCUTANEOUS",
+    "approval_date": "2002-12-31",
+    "dosage_form": "INJECTION",
+    "active_ingredient": "ADALIMUMAB",
+    "indications": [
+      "Rheumatoid Arthritis",
+      "Psoriatic Arthritis",
+      "Ankylosing Spondylitis",
+      "Crohn's Disease",
+      "Plaque Psoriasis",
+      "Ulcerative Colitis",
+      "Juvenile Idiopathic Arthritis",
+      "Hidradenitis Suppurativa",
+      "Uveitis"
+    ],
+    "marketing_status": "Prescription",
+    "te_code": null,
+    "reference_listed_drug": true
+  },
+  {
+    "application_number": "BLA761049",
+    "brand_name": "HADLIMA",
+    "generic_name": "adalimumab-bwwd",
+    "manufacturer_name": "SAMSUNG BIOEPIS",
+    "product_type": "BIOLOGIC",
+    "route": "SUBCUTANEOUS",
+    "approval_date": "2019-07-23",
+    "dosage_form": "INJECTION",
+    "active_ingredient": "ADALIMUMAB-BWWD",
+    "indications": [
+      "Rheumatoid Arthritis",
+      "Psoriatic Arthritis",
+      "Ankylosing Spondylitis",
+      "Plaque Psoriasis"
+    ],
+    "marketing_status": "Prescription",
+    "te_code": "BI",
+    "reference_listed_drug": false
+  }
+]

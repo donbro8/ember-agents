@@ -18,7 +18,6 @@ import pytest
 from ember_agents.search.agent import (
     SearchAgent,
     _MAX_RENDERED_CANDIDATES,
-    _candidate_label,
     _confidence_label,
 )
 from ember_agents.search.match import ScoredCandidate

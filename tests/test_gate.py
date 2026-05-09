@@ -4,10 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-import pytest
 
 from ember_agents.search.classify import ResolvedTerm, SearchSpec
-from ember_agents.search.gate import GateResult, NarrowingRequest, SearchGate
+from ember_agents.search.gate import NarrowingRequest, SearchGate
 
 try:
     from ember_data import DisambiguationRequest as EmberDisambiguationRequest

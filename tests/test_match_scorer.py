@@ -14,6 +14,7 @@ from ember_agents.search.match import (
     _build_query_document,
     _compute_overall,
     _normalize,
+    _QUERY_TYPE_WEIGHTS,
     _resolve_name_via_synonyms,
     _score_evidence,
     _score_structured,
@@ -716,3 +717,181 @@ def test_semantic_scoring_available(monkeypatch: Any) -> None:
 
     monkeypatch.setattr("ember_agents.search.match._CHROMA_AVAILABLE", False)
     assert semantic_scoring_available() is False
+
+
+# ---------------------------------------------------------------------------
+# Query-type-aware weight shifting
+# ---------------------------------------------------------------------------
+
+
+def test_query_type_weights_table_has_all_types() -> None:
+    """All required query types should be present in _QUERY_TYPE_WEIGHTS."""
+    expected_types = {"biosimilar_screen", "drug_lookup", "opportunity_scan", "general"}
+    assert expected_types == set(_QUERY_TYPE_WEIGHTS.keys())
+
+
+def test_query_type_weights_each_sum_to_one() -> None:
+    """Each query type weight tuple (structured, evidence, semantic) must sum to 1.0."""
+    for qt, (w_s, w_e, w_sem) in _QUERY_TYPE_WEIGHTS.items():
+        total = w_s + w_e + w_sem
+        assert abs(total - 1.0) < 1e-9, f"{qt}: weights sum to {total}, expected 1.0"
+
+
+def test_query_type_weights_biosimilar_screen() -> None:
+    w_s, w_e, w_sem = _QUERY_TYPE_WEIGHTS["biosimilar_screen"]
+    assert w_s == 0.5
+    assert w_e == 0.3
+    assert w_sem == 0.2
+
+
+def test_query_type_weights_drug_lookup() -> None:
+    w_s, w_e, w_sem = _QUERY_TYPE_WEIGHTS["drug_lookup"]
+    assert w_s == 0.3
+    assert w_e == 0.5
+    assert w_sem == 0.2
+
+
+def test_query_type_weights_opportunity_scan() -> None:
+    w_s, w_e, w_sem = _QUERY_TYPE_WEIGHTS["opportunity_scan"]
+    assert w_s == 0.4
+    assert w_e == 0.2
+    assert w_sem == 0.4
+
+
+def test_query_type_weights_general() -> None:
+    w_s, w_e, w_sem = _QUERY_TYPE_WEIGHTS["general"]
+    assert w_s == 0.4
+    assert w_e == 0.2
+    assert w_sem == 0.4
+
+
+def test_compute_overall_uses_query_type_weights_when_chroma_available(monkeypatch: Any) -> None:
+    """_compute_overall should use provided weights when ChromaDB is available."""
+    monkeypatch.setattr("ember_agents.search.match._CHROMA_AVAILABLE", True)
+
+    # biosimilar_screen: structured=0.5, evidence=0.3, semantic=0.2
+    w_s, w_e, w_sem = _QUERY_TYPE_WEIGHTS["biosimilar_screen"]
+    result = _compute_overall(0.6, 0.8, 0.4, w_structured=w_s, w_evidence=w_e, w_semantic=w_sem)
+    expected = 0.2 * 0.6 + 0.5 * 0.8 + 0.3 * 0.4
+    assert abs(result - expected) < 1e-9
+
+
+def test_compute_overall_drug_lookup_weights(monkeypatch: Any) -> None:
+    """drug_lookup shifts weight toward evidence (0.5)."""
+    monkeypatch.setattr("ember_agents.search.match._CHROMA_AVAILABLE", True)
+    w_s, w_e, w_sem = _QUERY_TYPE_WEIGHTS["drug_lookup"]
+    result = _compute_overall(0.6, 0.8, 0.4, w_structured=w_s, w_evidence=w_e, w_semantic=w_sem)
+    expected = 0.2 * 0.6 + 0.3 * 0.8 + 0.5 * 0.4
+    assert abs(result - expected) < 1e-9
+
+
+def test_compute_overall_no_chroma_rebalance_preserved_with_query_type_weights(
+    monkeypatch: Any,
+) -> None:
+    """When ChromaDB is unavailable, 0.65/0.35 rebalance is preserved regardless of weights."""
+    monkeypatch.setattr("ember_agents.search.match._CHROMA_AVAILABLE", False)
+    w_s, w_e, w_sem = _QUERY_TYPE_WEIGHTS["biosimilar_screen"]
+    result = _compute_overall(0.0, 0.5, 0.3, w_structured=w_s, w_evidence=w_e, w_semantic=w_sem)
+    expected = 0.65 * 0.5 + 0.35 * 0.3
+    assert abs(result - expected) < 1e-9
+
+
+async def test_score_query_type_biosimilar_screen_shifts_weights(monkeypatch: Any) -> None:
+    """biosimilar_screen query_type should increase structured weight to 0.5."""
+    monkeypatch.setattr("ember_agents.search.match._CHROMA_AVAILABLE", True)
+
+    scorer = _make_scorer()
+
+    # Candidate with strong structured match, weak evidence
+    cand_structured = _make_candidate(
+        drug_name="trastuzumab",
+        matched_dimensions=["drug_name"],
+    )
+    # Candidate with weak structured match, strong evidence
+    cand_evidence = _make_candidate(
+        drug_name="unrelated",
+        trials=[FakeTrial() for _ in range(10)],
+        patents=[FakePatent() for _ in range(10)],
+        articles=[FakeArticle() for _ in range(10)],
+    )
+
+    spec = FakeSpec(drug_names=["trastuzumab"])
+
+    # biosimilar_screen: structured=0.5 favours cand_structured
+    result_biosimilar = await scorer.score(
+        [cand_evidence, cand_structured],
+        spec,
+        query_type="biosimilar_screen",
+    )
+    assert len(result_biosimilar) == 2
+
+
+async def test_score_query_type_drug_lookup_shifts_weights(monkeypatch: Any) -> None:
+    """drug_lookup query_type should increase evidence weight to 0.5."""
+    monkeypatch.setattr("ember_agents.search.match._CHROMA_AVAILABLE", True)
+
+    scorer = _make_scorer()
+    cand = _make_candidate(
+        drug_name="imatinib",
+        trials=[FakeTrial() for _ in range(10)],
+    )
+    spec = FakeSpec(drug_names=["imatinib"])
+
+    result = await scorer.score([cand], spec, query_type="drug_lookup")
+    assert len(result) == 1
+    assert 0.0 <= result[0].overall_score <= 1.0
+
+
+async def test_score_query_type_unknown_falls_back_to_defaults(monkeypatch: Any) -> None:
+    """An unrecognised query_type should fall back to default weights."""
+    monkeypatch.setattr("ember_agents.search.match._CHROMA_AVAILABLE", True)
+
+    scorer = _make_scorer()
+    cand = _make_candidate(drug_name="trastuzumab")
+    spec = FakeSpec(drug_names=["trastuzumab"])
+
+    result_default = await scorer.score([cand], spec, query_type=None)
+    result_unknown = await scorer.score([cand], spec, query_type="nonexistent_type")
+
+    assert len(result_default) == 1
+    assert len(result_unknown) == 1
+    assert abs(result_default[0].overall_score - result_unknown[0].overall_score) < 1e-9
+
+
+async def test_score_query_type_none_uses_default_weights() -> None:
+    """Passing query_type=None (or omitting it) should use default weights."""
+    scorer = _make_scorer()
+    cand = _make_candidate(drug_name="trastuzumab")
+    spec = FakeSpec(drug_names=["trastuzumab"])
+
+    result_implicit = await scorer.score([cand], spec)
+    result_explicit_none = await scorer.score([cand], spec, query_type=None)
+
+    assert len(result_implicit) == 1
+    assert len(result_explicit_none) == 1
+    assert abs(result_implicit[0].overall_score - result_explicit_none[0].overall_score) < 1e-9
+
+
+async def test_score_query_type_opportunity_scan() -> None:
+    """opportunity_scan query_type should produce valid scores."""
+    scorer = _make_scorer()
+    cand = _make_candidate(
+        drug_name="pembrolizumab",
+        trials=[FakeTrial() for _ in range(3)],
+    )
+    spec = FakeSpec(drug_names=["pembrolizumab"])
+
+    result = await scorer.score([cand], spec, query_type="opportunity_scan")
+    assert len(result) == 1
+    assert 0.0 <= result[0].overall_score <= 1.0
+
+
+async def test_score_query_type_general() -> None:
+    """general query_type should produce valid scores identical to opportunity_scan weights."""
+    scorer = _make_scorer()
+    cand = _make_candidate(drug_name="pembrolizumab")
+    spec = FakeSpec(drug_names=["pembrolizumab"])
+
+    result = await scorer.score([cand], spec, query_type="general")
+    assert len(result) == 1
+    assert 0.0 <= result[0].overall_score <= 1.0

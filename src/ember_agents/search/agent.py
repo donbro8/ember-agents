@@ -15,13 +15,12 @@ from collections.abc import AsyncGenerator
 from typing import Any
 
 from ember_agents.base import Agent
-from ember_agents.factory import register_agent
 from ember_agents.search.classify import ClassificationOrchestrator, DisambiguationRequest
 from ember_agents.search.fetch import FetchOrchestrator
 from ember_agents.search.gate import GateResult, NarrowingRequest, SearchGate
 from ember_agents.search.interpret import IntentExtractor, RawSignals
 from ember_agents.search.match import MatchScorer, ScoredCandidate, semantic_scoring_available
-from ember_agents.search.urls import drug_label_url, patent_url, pubmed_url, trial_url, uniprot_url
+from ember_agents.search.urls import patent_url, pubmed_url, trial_url, uniprot_url
 
 # Maximum number of disambiguation/narrowing loops before giving up.
 _MAX_GATE_LOOPS = 5
@@ -131,7 +130,6 @@ def _resolve_dimension_value(
     return dim
 
 
-@register_agent("search")
 class SearchAgent(Agent):
     """Orchestrates the Interpret → Classify → Gate → Fetch → Match pipeline.
 

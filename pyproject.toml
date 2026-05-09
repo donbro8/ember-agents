@@ -36,3 +36,8 @@ ember-bio-data = { path = "../ember-data", editable = true }
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+markers = [
+    "contract: Tier 1 contract tests using recorded fixtures (no network access required)",
+    "integration: Tier 2 integration tests with reference queries (mocked pipeline, no network required)",
+    "benchmark: Tier 3 scoring benchmarks asserting known-relevant candidates appear in expected rank ranges (soft-gated)",
+]

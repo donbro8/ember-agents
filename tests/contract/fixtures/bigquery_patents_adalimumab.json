@@ -1,0 +1,46 @@
+[
+  {
+    "publication_number": "US8889135B2",
+    "country_code": "US",
+    "filing_date": "2002-12-20",
+    "grant_date": "2014-11-18",
+    "expiry_date": "2022-12-20",
+    "title": "Human antibodies that bind human TNF alpha",
+    "abstract": "Isolated human antibodies, particularly human monoclonal antibodies, that bind to human TNF alpha with high affinity and neutralize TNF alpha activity are disclosed. Methods for producing these antibodies and pharmaceutical compositions comprising them are also provided.",
+    "assignee": "AbbVie Biotechnology Ltd",
+    "status": "expired"
+  },
+  {
+    "publication_number": "US9090867B2",
+    "country_code": "US",
+    "filing_date": "2013-06-17",
+    "grant_date": "2015-07-28",
+    "expiry_date": "2033-06-17",
+    "title": "Methods of administering adalimumab for treatment of Crohn's disease",
+    "abstract": "Methods of treating Crohn's disease by administering adalimumab are disclosed. The methods include subcutaneous administration of specific dosing regimens that demonstrate clinical remission.",
+    "assignee": "AbbVie Inc",
+    "status": "active"
+  },
+  {
+    "publication_number": "EP1406656B1",
+    "country_code": "EP",
+    "filing_date": "2002-06-14",
+    "grant_date": "2010-03-31",
+    "expiry_date": "2022-06-14",
+    "title": "Human anti-TNF antibodies and methods of use",
+    "abstract": "Human antibodies to TNF alpha useful in treating rheumatoid arthritis and other TNF-mediated conditions.",
+    "assignee": "Abbott Laboratories",
+    "status": "expired"
+  },
+  {
+    "publication_number": "JP5357037B2",
+    "country_code": "JP",
+    "filing_date": "2002-06-14",
+    "grant_date": "2013-11-27",
+    "expiry_date": "2022-06-14",
+    "title": "ヒトTNFアルファに結合するヒト抗体",
+    "abstract": "ヒトTNFアルファに高い親和性で結合し、TNFアルファ活性を中和するヒトモノクローナル抗体。",
+    "assignee": "Abbott Laboratories",
+    "status": "expired"
+  }
+]

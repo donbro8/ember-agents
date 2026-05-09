@@ -1,0 +1,64 @@
+{
+  "results": [
+    {
+      "primaryAccession": "P01375",
+      "uniProtkbId": "TNFA_HUMAN",
+      "organism": {
+        "scientificName": "Homo sapiens",
+        "commonName": "Human",
+        "taxonId": 9606
+      },
+      "proteinDescription": {
+        "recommendedName": {
+          "fullName": {
+            "value": "Tumor necrosis factor"
+          },
+          "shortNames": ["TNF", "TNF-alpha"]
+        },
+        "alternativeNames": [
+          {"fullName": {"value": "Cachectin"}},
+          {"fullName": {"value": "Tumor necrosis factor ligand superfamily member 2"}}
+        ]
+      },
+      "genes": [
+        {
+          "geneName": {"value": "TNF"},
+          "synonyms": [{"value": "TNFA"}, {"value": "TNFSF2"}]
+        }
+      ],
+      "sequence": {
+        "length": 233,
+        "molWeight": 25644,
+        "crcId": "8C7EE7E8E52DE5E9"
+      },
+      "features": [
+        {
+          "type": "Chain",
+          "description": "Tumor necrosis factor, membrane form",
+          "location": {"start": {"value": 1}, "end": {"value": 233}}
+        },
+        {
+          "type": "Chain",
+          "description": "Tumor necrosis factor, soluble form",
+          "location": {"start": {"value": 77}, "end": {"value": 233}}
+        }
+      ],
+      "keywords": [
+        {"name": "Inflammatory response"},
+        {"name": "Cytokine"},
+        {"name": "Apoptosis"},
+        {"name": "3D-structure"}
+      ],
+      "references": [
+        {
+          "citation": {
+            "title": "Cloning of the genes for T-cell growth factor and gamma-interferon",
+            "journal": "Nature",
+            "publicationDate": "1984"
+          }
+        }
+      ]
+    }
+  ],
+  "totalResults": 1
+}

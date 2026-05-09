@@ -1,0 +1,69 @@
+[
+  {
+    "drug_name": "adalimumab",
+    "brand_names": ["Humira"],
+    "originator": "AbbVie",
+    "target_antigen": "TNF-alpha",
+    "modality": "mAb",
+    "category": "mAb",
+    "cell_line": "NS0",
+    "cell_line_class": "mammalian",
+    "indications": [
+      "Rheumatoid Arthritis",
+      "Psoriatic Arthritis",
+      "Ankylosing Spondylitis",
+      "Crohn's Disease",
+      "Plaque Psoriasis",
+      "Ulcerative Colitis"
+    ],
+    "annual_revenue_usd_millions": 20694.0,
+    "revenue_year": 2022,
+    "patent_expiries": {
+      "US": "2023-01-31",
+      "EU": "2023-10-16"
+    },
+    "key_patent_numbers": ["US8889135B2", "EP1406656B1"],
+    "biosimilar_competitors": [
+      "adalimumab-atto",
+      "adalimumab-adbm",
+      "adalimumab-afzb",
+      "adalimumab-bwwd",
+      "adalimumab-fkjp",
+      "adalimumab-adaz",
+      "adalimumab-aqvh",
+      "adalimumab-minf"
+    ],
+    "has_approved_biosimilar": true,
+    "notes": "First fully human anti-TNF mAb; top-selling biologic for most of 2010s."
+  },
+  {
+    "drug_name": "trastuzumab",
+    "brand_names": ["Herceptin"],
+    "originator": "Genentech/Roche",
+    "target_antigen": "HER2",
+    "modality": "mAb",
+    "category": "mAb",
+    "cell_line": "CHO",
+    "cell_line_class": "mammalian",
+    "indications": [
+      "HER2-positive Breast Cancer",
+      "HER2-positive Gastric Cancer"
+    ],
+    "annual_revenue_usd_millions": 3200.0,
+    "revenue_year": 2022,
+    "patent_expiries": {
+      "US": "2019-06-30",
+      "EU": "2014-07-18"
+    },
+    "key_patent_numbers": ["US5821337B2", "EP0590058B1"],
+    "biosimilar_competitors": [
+      "trastuzumab-dkst",
+      "trastuzumab-pkrb",
+      "trastuzumab-dttb",
+      "trastuzumab-anns",
+      "trastuzumab-qyyp"
+    ],
+    "has_approved_biosimilar": true,
+    "notes": "Anti-HER2 mAb for breast and gastric cancers."
+  }
+]

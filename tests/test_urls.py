@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 
 from ember_agents.search.urls import (
     drug_label_url,

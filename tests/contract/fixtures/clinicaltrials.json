@@ -1,0 +1,58 @@
+{
+  "studies": [
+    {
+      "nctId": "NCT00195702",
+      "briefTitle": "Adalimumab in Subjects With Active Rheumatoid Arthritis (ARMADA)",
+      "officialTitle": "A Randomized, Double-blind, Placebo-controlled, Multicenter Study of the Efficacy and Safety of Adalimumab in Subjects With Active Rheumatoid Arthritis",
+      "overallStatus": "COMPLETED",
+      "phase": "Phase 3",
+      "conditions": ["Rheumatoid Arthritis"],
+      "interventions": [
+        {
+          "type": "DRUG",
+          "name": "adalimumab",
+          "description": "40 mg subcutaneous every other week"
+        }
+      ],
+      "sponsor": {
+        "name": "AbbVie",
+        "class": "INDUSTRY"
+      },
+      "enrollmentCount": 271,
+      "startDate": "2000-07-01",
+      "completionDate": "2003-01-31",
+      "primaryOutcome": "ACR20 response rate at Week 24",
+      "locations": [
+        {"facility": "Multiple Sites", "country": "United States"}
+      ]
+    },
+    {
+      "nctId": "NCT00403533",
+      "briefTitle": "Study Evaluating Adalimumab in Moderate to Severe Plaque Psoriasis (REVEAL)",
+      "officialTitle": "A Phase 3 Randomized Double-blind Placebo-controlled Study of Adalimumab for the Treatment of Moderate to Severe Plaque Psoriasis",
+      "overallStatus": "COMPLETED",
+      "phase": "Phase 3",
+      "conditions": ["Plaque Psoriasis"],
+      "interventions": [
+        {
+          "type": "DRUG",
+          "name": "adalimumab",
+          "description": "80 mg at Week 0, 40 mg at Week 1, then 40 mg every other week"
+        }
+      ],
+      "sponsor": {
+        "name": "AbbVie",
+        "class": "INDUSTRY"
+      },
+      "enrollmentCount": 1212,
+      "startDate": "2005-10-01",
+      "completionDate": "2007-08-31",
+      "primaryOutcome": "PASI 75 at Week 16",
+      "locations": [
+        {"facility": "Multiple Sites", "country": "United States"}
+      ]
+    }
+  ],
+  "totalCount": 2,
+  "nextPageToken": null
+}

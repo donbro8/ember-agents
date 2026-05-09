@@ -39,6 +39,8 @@ def test_raw_signals_defaults_are_dimension_tagged() -> None:
     assert signals.indication == []
     assert signals.temporal is None
     assert signals.commercial == []
+    assert signals.query_type == "general"
+    assert signals.drug_name == []
 
 
 def test_temporal_signal_accepts_date_window_compatible_fields() -> None:
@@ -93,3 +95,75 @@ async def test_prompt_includes_temporal_mapping_rules(monkeypatch) -> None:
     assert "between now and 2028" in system_prompt
     assert "not expired yet" in system_prompt
     assert date.today().isoformat() in system_prompt
+
+
+@pytest.mark.asyncio
+async def test_query_type_drug_lookup(monkeypatch) -> None:
+    response = RawSignals(query_type="drug_lookup", drug_name=["adalimumab"])
+    calls: list[dict] = []
+    fake_chat = _FakeChatGoogleGenerativeAI(response, calls)
+    monkeypatch.setattr("ember_agents.search.interpret.ChatGoogleGenerativeAI", fake_chat)
+
+    extractor = IntentExtractor()
+    signals = await extractor.extract("adalimumab")
+
+    assert signals.query_type == "drug_lookup"
+    assert "adalimumab" in signals.drug_name
+
+
+@pytest.mark.asyncio
+async def test_query_type_opportunity_scan(monkeypatch) -> None:
+    response = RawSignals(query_type="opportunity_scan")
+    calls: list[dict] = []
+    fake_chat = _FakeChatGoogleGenerativeAI(response, calls)
+    monkeypatch.setattr("ember_agents.search.interpret.ChatGoogleGenerativeAI", fake_chat)
+
+    extractor = IntentExtractor()
+    signals = await extractor.extract("PD-1 inhibitors expiring 2028")
+
+    assert signals.query_type == "opportunity_scan"
+
+
+@pytest.mark.asyncio
+async def test_query_type_biosimilar_screen(monkeypatch) -> None:
+    response = RawSignals(query_type="biosimilar_screen")
+    calls: list[dict] = []
+    fake_chat = _FakeChatGoogleGenerativeAI(response, calls)
+    monkeypatch.setattr("ember_agents.search.interpret.ChatGoogleGenerativeAI", fake_chat)
+
+    extractor = IntentExtractor()
+    signals = await extractor.extract("biosimilar opportunities revenue >1B")
+
+    assert signals.query_type == "biosimilar_screen"
+
+
+@pytest.mark.asyncio
+async def test_query_type_general(monkeypatch) -> None:
+    response = RawSignals(query_type="general")
+    calls: list[dict] = []
+    fake_chat = _FakeChatGoogleGenerativeAI(response, calls)
+    monkeypatch.setattr("ember_agents.search.interpret.ChatGoogleGenerativeAI", fake_chat)
+
+    extractor = IntentExtractor()
+    signals = await extractor.extract("VEGF pathway")
+
+    assert signals.query_type == "general"
+
+
+@pytest.mark.asyncio
+async def test_prompt_includes_query_type_and_drug_name_rules(monkeypatch) -> None:
+    response = RawSignals()
+    calls: list[dict] = []
+    fake_chat = _FakeChatGoogleGenerativeAI(response, calls)
+    monkeypatch.setattr("ember_agents.search.interpret.ChatGoogleGenerativeAI", fake_chat)
+
+    extractor = IntentExtractor()
+    llm = extractor._llm
+    await extractor.extract("adalimumab biosimilar")
+
+    system_prompt = llm.messages[0][1]
+    assert "query_type" in system_prompt
+    assert "drug_lookup" in system_prompt
+    assert "opportunity_scan" in system_prompt
+    assert "biosimilar_screen" in system_prompt
+    assert "drug_name" in system_prompt

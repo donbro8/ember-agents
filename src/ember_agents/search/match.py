@@ -131,6 +131,14 @@ _WEIGHT_SEMANTIC: float = 0.4
 _WEIGHT_STRUCTURED: float = 0.4
 _WEIGHT_EVIDENCE: float = 0.2
 
+# Per-query-type weight configurations: (structured, evidence, semantic)
+_QUERY_TYPE_WEIGHTS: dict[str, tuple[float, float, float]] = {
+    "biosimilar_screen": (0.5, 0.3, 0.2),
+    "drug_lookup": (0.3, 0.5, 0.2),
+    "opportunity_scan": (0.4, 0.2, 0.4),
+    "general": (0.4, 0.2, 0.4),
+}
+
 # Maximum evidence items considered for full evidence score normalisation
 _MAX_TRIALS: int = 10
 _MAX_PATENTS: int = 10
@@ -502,18 +510,31 @@ def _score_evidence(candidate: Any) -> float:
     return (trials_score + patents_score + articles_score) / 3.0
 
 
-def _compute_overall(semantic: float, structured: float, evidence: float) -> float:
+def _compute_overall(
+    semantic: float,
+    structured: float,
+    evidence: float,
+    *,
+    w_structured: float = _WEIGHT_STRUCTURED,
+    w_evidence: float = _WEIGHT_EVIDENCE,
+    w_semantic: float = _WEIGHT_SEMANTIC,
+) -> float:
     """Weighted combination of the three scoring signals.
 
     When ChromaDB is unavailable the semantic signal is always 0, so we
     rebalance the remaining two signals to avoid wasting 40 % of the
     score range.
+
+    Optional keyword arguments ``w_structured``, ``w_evidence``, and
+    ``w_semantic`` allow callers to override the default weights (e.g. for
+    query-type-aware scoring).  When ChromaDB is unavailable the original
+    0.65 / 0.35 rebalance is preserved regardless of any weight overrides.
     """
     if _CHROMA_AVAILABLE:
         return (
-            _WEIGHT_SEMANTIC * semantic
-            + _WEIGHT_STRUCTURED * structured
-            + _WEIGHT_EVIDENCE * evidence
+            w_semantic * semantic
+            + w_structured * structured
+            + w_evidence * evidence
         )
     return 0.65 * structured + 0.35 * evidence
 
@@ -672,6 +693,7 @@ class MatchScorer:
         spec: Any,
         *,
         query_text: str = "",
+        query_type: str | None = None,
     ) -> list[ScoredCandidate]:
         """Score and rank *candidates* against *spec* and *query_text*.
 
@@ -686,6 +708,11 @@ class MatchScorer:
         query_text:
             The user's original free-text query string.  Combined with
             resolved SearchSpec fields to build the embedding query vector.
+        query_type:
+            Optional query type string that shifts the scoring weights.
+            Recognised values: ``"biosimilar_screen"``, ``"drug_lookup"``,
+            ``"opportunity_scan"``, ``"general"``.  Unknown values fall back
+            to the default weights (structured=0.4, evidence=0.2, semantic=0.4).
 
         Returns
         -------
@@ -694,6 +721,16 @@ class MatchScorer:
         """
         if not candidates:
             return []
+
+        # Resolve per-query-type weights
+        if query_type is not None and query_type in _QUERY_TYPE_WEIGHTS:
+            w_structured, w_evidence, w_semantic = _QUERY_TYPE_WEIGHTS[query_type]
+        else:
+            w_structured, w_evidence, w_semantic = (
+                _WEIGHT_STRUCTURED,
+                _WEIGHT_EVIDENCE,
+                _WEIGHT_SEMANTIC,
+            )
 
         # Resolve query text from spec if not provided
         if not query_text:
@@ -732,7 +769,14 @@ class MatchScorer:
                 candidate, spec, self._atc_table, self._uniprot_table
             )
             evidence = _score_evidence(candidate)
-            overall = _compute_overall(semantic, structured, evidence)
+            overall = _compute_overall(
+                semantic,
+                structured,
+                evidence,
+                w_structured=w_structured,
+                w_evidence=w_evidence,
+                w_semantic=w_semantic,
+            )
 
             # Write scores back to candidate's scores object
             self._write_scores(candidate, semantic, structured, evidence)

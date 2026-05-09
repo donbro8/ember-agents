@@ -23,8 +23,9 @@ You are a pharmaceutical-intelligence signal extractor.
 Today's date is {today}.
 
 Your task is to parse a natural-language search query and extract structured
-signals across five dimensions.  Return ONLY a JSON object that matches the
-schema described below.  Do not include explanation or prose outside the JSON.
+signals across five dimensions plus a query classification.  Return ONLY a JSON
+object that matches the schema described below.  Do not include explanation or
+prose outside the JSON.
 
 ## Dimensions
 
@@ -50,6 +51,34 @@ schema described below.  Do not include explanation or prose outside the JSON.
 5. **commercial** – Market, geography, or revenue constraints (e.g. "US", "EU",
    "revenue > 1B", "top-selling").  Extract verbatim or lightly normalised.
 
+## Query classification
+
+Set `query_type` to one of the following values based on the primary intent of
+the query:
+
+- `drug_lookup` – The query names one or more specific drugs (by INN or brand
+  name) and is primarily asking about those drugs.  Example: "adalimumab",
+  "Humira patent expiry", "trastuzumab biosimilar".
+- `opportunity_scan` – The query asks for a broad set of patent or market
+  opportunities, often with date or exclusivity filters but without naming
+  specific drugs.  Example: "PD-1 inhibitors expiring 2028", "mAbs losing
+  exclusivity before 2030".
+- `biosimilar_screen` – The query explicitly asks about biosimilar opportunities
+  or filters.  Example: "biosimilar opportunities revenue >1B", "biosimilar
+  candidates for monoclonal antibodies".
+- `general` – Everything else that does not fit the above categories.  Example:
+  "VEGF pathway", "what is a bispecific antibody".
+
+Use the most specific matching category.  If a query names a drug AND asks about
+biosimilar opportunities, prefer `biosimilar_screen`.
+
+## Drug name extraction
+
+Set `drug_name` to a list of drug names (INN or brand names) explicitly
+mentioned in the query.  Extract only names that appear in the query; do not
+infer names from targets or indications.  Return an empty list `[]` when no
+drug names are present.
+
 ## Output rules
 
 - Return empty lists `[]` for dimensions with no signal.
@@ -74,6 +103,17 @@ class RawSignals(BaseModel):
     indication: list[str] = Field(default_factory=list)
     temporal: TemporalSignal | None = None
     commercial: list[str] = Field(default_factory=list)
+    query_type: str = Field(
+        default="general",
+        description=(
+            "Query classification: opportunity_scan | drug_lookup | "
+            "biosimilar_screen | general"
+        ),
+    )
+    drug_name: list[str] = Field(
+        default_factory=list,
+        description="Drug names (INN or brand names) mentioned in the query.",
+    )
 
 
 class IntentExtractor:

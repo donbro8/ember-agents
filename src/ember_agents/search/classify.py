@@ -352,7 +352,7 @@ class ClassificationOrchestrator:
         spec = SearchSpec(
             target=target_term,
             therapeutic_area=therapeutic_area_term,
-            drug_names=[],
+            drug_names=list(signals.drug_name) if hasattr(signals, "drug_name") else [],
             indications=indications,
             modality=modality_value,
             resolved_terms=all_resolved,

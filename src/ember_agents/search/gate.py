@@ -12,7 +12,7 @@ All user-facing prompts emitted by this module are closed-option — never open-
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
 try:

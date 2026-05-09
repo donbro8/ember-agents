@@ -1,19 +1,12 @@
 """Ember Bio agent framework.
 
-Provides the base Agent class, factory utilities, and built-in agents.
+Provides the base Agent class and EmberAgent unified pipeline.
 """
 
+from ember_agents.agent import EmberAgent
 from ember_agents.base import Agent
-from ember_agents.biosimilar import BiosimilarAgent
-from ember_agents.discovery import DiscoveryAgent
-from ember_agents.factory import AgentFactory, get_agent
-from ember_agents.search import SearchAgent
 
 __all__ = [
     "Agent",
-    "AgentFactory",
-    "BiosimilarAgent",
-    "DiscoveryAgent",
-    "SearchAgent",
-    "get_agent",
+    "EmberAgent",
 ]

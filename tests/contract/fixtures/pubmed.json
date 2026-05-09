@@ -1,0 +1,50 @@
+{
+  "header": {
+    "type": "esearch",
+    "version": "0.3"
+  },
+  "esearchresult": {
+    "count": "2",
+    "retmax": "2",
+    "retstart": "0",
+    "idlist": ["26753307", "21209892"]
+  },
+  "articles": [
+    {
+      "pmid": "26753307",
+      "title": "Adalimumab: A Review of its Use in Adult Patients with Rheumatoid Arthritis",
+      "abstract": "Adalimumab (Humira) is a fully human anti-tumour necrosis factor (TNF) monoclonal antibody that specifically binds to TNF-alpha and blocks its interaction with the p55 and p75 cell surface TNF receptors. This article reviews the use of adalimumab in adult patients with moderate to severely active rheumatoid arthritis (RA).",
+      "authors": [
+        {"name": "Markham A", "affiliation": "Springer, Auckland, New Zealand"},
+        {"name": "Lamb HM", "affiliation": "Adis International, Auckland, New Zealand"}
+      ],
+      "journal": "Drugs",
+      "publication_date": "2000-01-01",
+      "doi": "10.2165/00003495-200059030-00011",
+      "mesh_terms": [
+        "Adalimumab",
+        "Rheumatoid Arthritis",
+        "TNF-alpha",
+        "Biologic Therapy"
+      ]
+    },
+    {
+      "pmid": "21209892",
+      "title": "Biosimilars of adalimumab: current status and future perspectives",
+      "abstract": "Adalimumab (Humira) was the first fully human anti-TNF monoclonal antibody approved for treating multiple immune-mediated inflammatory conditions. As the originator product faces patent expiry, multiple biosimilar versions are under development or have received regulatory approval.",
+      "authors": [
+        {"name": "Dorner T", "affiliation": "Charite University Medicine, Berlin, Germany"},
+        {"name": "Kay J", "affiliation": "University of Massachusetts Medical School"}
+      ],
+      "journal": "Current Opinion in Rheumatology",
+      "publication_date": "2021-01-01",
+      "doi": "10.1097/BOR.0000000000000768",
+      "mesh_terms": [
+        "Biosimilar Pharmaceuticals",
+        "Adalimumab",
+        "Patent Expiry",
+        "Monoclonal Antibodies"
+      ]
+    }
+  ]
+}
