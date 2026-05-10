@@ -224,9 +224,14 @@ class BiologicSeedSource:
     @staticmethod
     def _load(path: Path) -> list[Any]:
         """Parse the seed JSON file and return a list of BiologicEntry objects."""
-        raw: list[dict] = json.loads(path.read_text(encoding="utf-8"))
-        if not isinstance(raw, list):
-            raise ValueError(f"Expected a JSON array in {path}, got {type(raw).__name__}")
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(raw, dict):
+            entries = raw.get("entries")
+            if not isinstance(entries, list):
+                raise ValueError(f"Expected 'entries' key with a list in {path}")
+            raw = entries
+        elif not isinstance(raw, list):
+            raise ValueError(f"Expected a JSON array or versioned object in {path}, got {type(raw).__name__}")
 
         if _EMBER_DATA_AVAILABLE and BiologicEntry is not None:
             return [BiologicEntry.model_validate(item) for item in raw]
