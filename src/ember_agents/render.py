@@ -72,12 +72,15 @@ class ResultRenderer:
         self,
         trace: ExecutionTrace,
         results: list[Any],
+        *,
+        synthesis_overview: str | None = None,
     ) -> str:
         """Render *trace* and *results* as a markdown string.
 
         Args:
             trace: Execution trace from the EmberAgent pipeline.
             results: List of CandidateResult objects to display.
+            synthesis_overview: Optional overview text from ResultSynthesizer.
 
         Returns:
             Markdown-formatted string suitable for streaming to the caller.
@@ -87,6 +90,8 @@ class ResultRenderer:
         sections.append(self._render_query_analysis(trace))
         sections.append(self._render_source_table(trace))
         sections.append(self._render_results(results))
+        if synthesis_overview is not None:
+            sections.append(self._render_synthesis(synthesis_overview))
 
         return "\n\n".join(s for s in sections if s)
 
@@ -271,3 +276,7 @@ class ResultRenderer:
                 lines.append(f"**Sources:** {' · '.join(url_links)}")
 
         return "\n".join(lines)
+
+    def _render_synthesis(self, overview: str) -> str:
+        """Render the synthesis analysis section."""
+        return f"## Analysis\n\n{overview}"

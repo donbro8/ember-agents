@@ -20,6 +20,7 @@ from typing import Any
 from ember_agents.base import Agent
 from ember_agents.render import ResultRenderer
 from ember_agents.search.classify import ClassificationOrchestrator
+from ember_agents.synthesis import ResultSynthesizer
 from ember_agents.search.fetch import FetchOrchestrator
 from ember_agents.search.gate import SearchGate
 from ember_agents.search.interpret import IntentExtractor, RawSignals
@@ -83,6 +84,7 @@ class PipelineOutput:
     trace: Any  # ExecutionTrace
     query_type: str
     run_id: str
+    synthesis_overview: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -390,6 +392,7 @@ class EmberAgent(Agent):
         scorer: MatchScorer,
         seed_source: BiologicSeedSource,
         renderer: ResultRenderer | None = None,
+        synthesizer: ResultSynthesizer | None = None,
     ) -> None:
         self._extractor = intent_extractor
         self._classifier = classifier
@@ -398,6 +401,7 @@ class EmberAgent(Agent):
         self._scorer = scorer
         self._seed_source = seed_source
         self._renderer = renderer or ResultRenderer()
+        self._synthesizer = synthesizer
 
     # ------------------------------------------------------------------
     # Agent ABC implementation
@@ -540,7 +544,7 @@ class EmberAgent(Agent):
             duration_seconds=duration,
         )
 
-        yield self._renderer.render(trace, candidate_results)
+        yield self._renderer.render(trace, candidate_results, synthesis_overview=None)
 
     # ------------------------------------------------------------------
     # Non-streaming execute() API
@@ -709,6 +713,23 @@ class EmberAgent(Agent):
         candidate_results: list[Any] = [_candidate_to_result(sc) for sc in scored_candidates]
 
         # ----------------------------------------------------------------
+        # Phase 5.5: Synthesize (optional)
+        # ----------------------------------------------------------------
+        synthesis_overview: str | None = None
+        if self._synthesizer is not None:
+            try:
+                synthesis_output = await self._synthesizer.synthesize(
+                    query, signals.query_type, candidate_results, None,
+                )
+                synthesis_overview = synthesis_output.overview
+                for cr in candidate_results:
+                    cid = getattr(cr, "canonical_id", None)
+                    if cid and cid in synthesis_output.per_candidate:
+                        cr.synthesis_summary = synthesis_output.per_candidate[cid]
+            except Exception:  # noqa: BLE001
+                pass  # graceful degradation — synthesis is optional
+
+        # ----------------------------------------------------------------
         # Phase 6: Render
         # ----------------------------------------------------------------
         duration = time.monotonic() - start_time
@@ -721,7 +742,7 @@ class EmberAgent(Agent):
             duration_seconds=duration,
         )
 
-        markdown = self._renderer.render(trace, candidate_results)
+        markdown = self._renderer.render(trace, candidate_results, synthesis_overview=synthesis_overview)
 
         return PipelineOutput(
             markdown=markdown,
@@ -729,6 +750,7 @@ class EmberAgent(Agent):
             trace=trace,
             query_type=signals.query_type,
             run_id=run_id,
+            synthesis_overview=synthesis_overview,
         )
 
 

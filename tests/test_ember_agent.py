@@ -9,9 +9,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ember_agents.agent import EmberAgent, _candidate_to_result, _signals_to_dict, _spec_to_classifications
+from ember_agents.agent import EmberAgent, PipelineOutput, _candidate_to_result, _signals_to_dict, _spec_to_classifications
 from ember_agents.render import ResultRenderer
 from ember_agents.search.classify import ClassificationOrchestrator, ClassificationResult
+from ember_agents.synthesis import ResultSynthesizer, SynthesisOutput
 from ember_agents.search.fetch import FetchOrchestrator, FetchResult
 from ember_agents.search.gate import GateResult, SearchGate
 from ember_agents.search.interpret import IntentExtractor, RawSignals
@@ -101,6 +102,7 @@ def _make_agent(
     fetch_results: list[Any] | None = None,
     seed_fetch_results: list[FetchResult] | None = None,
     scored: list[ScoredCandidate] | None = None,
+    synthesizer: ResultSynthesizer | None = None,
 ) -> EmberAgent:
     """Build a fully-mocked EmberAgent for testing."""
     _signals = signals or _make_signals()
@@ -136,6 +138,7 @@ def _make_agent(
         fetcher=fetcher,
         scorer=scorer,
         seed_source=seed_source,
+        synthesizer=synthesizer,
     )
 
 
@@ -607,3 +610,117 @@ class TestHelpers:
         spec = FakeSearchSpec()
         classifications = _spec_to_classifications(spec)
         assert classifications == {}
+
+
+# ---------------------------------------------------------------------------
+# Tests: synthesis integration
+# ---------------------------------------------------------------------------
+
+
+class TestSynthesisIntegration:
+    @pytest.mark.asyncio
+    async def test_execute_without_synthesizer(self):
+        """Pipeline completes normally when synthesizer is None (default)."""
+        agent = _make_agent()
+        output = await agent.execute("adalimumab biosimilar")
+        assert isinstance(output, PipelineOutput)
+        assert output.synthesis_overview is None
+        assert len(output.results) > 0
+
+    @pytest.mark.asyncio
+    async def test_execute_with_synthesizer_populates_overview(self):
+        """When synthesizer returns valid output, synthesis_overview is populated."""
+        synthesis_output = SynthesisOutput(
+            overview="Adalimumab faces patent cliff in 2025.",
+            per_candidate={"fda:adalimumab": "Top biosimilar opportunity."},
+            jurisdiction_insights="US expires before EU.",
+        )
+        mock_synthesizer = MagicMock(spec=ResultSynthesizer)
+        mock_synthesizer.synthesize = AsyncMock(return_value=synthesis_output)
+
+        agent = _make_agent(synthesizer=mock_synthesizer)
+        output = await agent.execute("adalimumab biosimilar")
+
+        assert output.synthesis_overview == "Adalimumab faces patent cliff in 2025."
+        mock_synthesizer.synthesize.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_execute_with_synthesizer_populates_per_candidate(self):
+        """When synthesizer returns per_candidate data, synthesis_summary is set on matching results."""
+        # Create a result that will have a canonical_id we can match
+        scored = [_make_scored("adalimumab", overall_score=0.75)]
+        agent = _make_agent(scored=scored)
+
+        # Get the canonical_id that the result will have
+        output_without = await agent.execute("adalimumab")
+        if output_without.results:
+            cid = getattr(output_without.results[0], "canonical_id", None)
+        else:
+            cid = None
+
+        if cid is None:
+            # If CandidateResult is not available (no ember-data), just verify
+            # the synthesizer was called but skip the per_candidate check
+            pytest.skip("ember-data not installed, cannot test canonical_id matching")
+
+        synthesis_output = SynthesisOutput(
+            overview="Analysis overview.",
+            per_candidate={cid: "Key biosimilar candidate."},
+            jurisdiction_insights=None,
+        )
+        mock_synthesizer = MagicMock(spec=ResultSynthesizer)
+        mock_synthesizer.synthesize = AsyncMock(return_value=synthesis_output)
+
+        agent2 = _make_agent(scored=scored, synthesizer=mock_synthesizer)
+        output = await agent2.execute("adalimumab")
+
+        matched = [r for r in output.results if getattr(r, "canonical_id", None) == cid]
+        assert len(matched) == 1
+        assert matched[0].synthesis_summary == "Key biosimilar candidate."
+
+    @pytest.mark.asyncio
+    async def test_execute_with_synthesizer_error_degrades_gracefully(self):
+        """When synthesizer raises, pipeline still completes with results."""
+        mock_synthesizer = MagicMock(spec=ResultSynthesizer)
+        mock_synthesizer.synthesize = AsyncMock(side_effect=RuntimeError("LLM down"))
+
+        agent = _make_agent(synthesizer=mock_synthesizer)
+        output = await agent.execute("adalimumab biosimilar")
+
+        assert isinstance(output, PipelineOutput)
+        assert output.synthesis_overview is None
+        assert len(output.results) > 0
+
+    @pytest.mark.asyncio
+    async def test_execute_with_synthesizer_overview_in_markdown(self):
+        """When synthesis succeeds, the Analysis section appears in markdown output."""
+        synthesis_output = SynthesisOutput(
+            overview="Patent cliff analysis shows opportunity.",
+            per_candidate={},
+            jurisdiction_insights=None,
+        )
+        mock_synthesizer = MagicMock(spec=ResultSynthesizer)
+        mock_synthesizer.synthesize = AsyncMock(return_value=synthesis_output)
+
+        agent = _make_agent(synthesizer=mock_synthesizer)
+        output = await agent.execute("adalimumab biosimilar")
+
+        assert "## Analysis" in output.markdown
+        assert "Patent cliff analysis shows opportunity." in output.markdown
+
+
+class TestResultRendererSynthesis:
+    def test_render_without_synthesis_overview(self):
+        """Renderer does not include Analysis section when synthesis_overview is None."""
+        renderer = ResultRenderer()
+        trace = ExecutionTrace(query_type="general", gate_outcome="passed", duration_seconds=0.1)
+        output = renderer.render(trace, [])
+        assert "## Analysis" not in output
+
+    def test_render_with_synthesis_overview(self):
+        """Renderer includes Analysis section when synthesis_overview is provided."""
+        renderer = ResultRenderer()
+        trace = ExecutionTrace(query_type="general", gate_outcome="passed", duration_seconds=0.1)
+        output = renderer.render(trace, [], synthesis_overview="Key insights here.")
+        assert "## Analysis" in output
+        assert "Key insights here." in output
