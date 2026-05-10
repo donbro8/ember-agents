@@ -6,6 +6,13 @@ Validates that:
 - Evidence counts only show non-zero items
 - _render_results caps output at 10 candidates with a summary for the rest
 - Sources, synthesis summary, and contributing sources sections are preserved
+
+Also covers TASK-078/TASK-079 ResultRenderer improvements:
+- Score breakdown line per candidate
+- Patent table Link column with approximate date marker
+- Evidence counts with singular/plural, zero sections omitted
+- Commercial line when revenue is present
+- Source URLs with domain-derived labels
 """
 
 from __future__ import annotations
@@ -334,3 +341,247 @@ class TestSynthesisSummaryLowConfidence:
         scored = [_make_scored(rank=1, overall=0.30, drug_name="BorderDrug")]
         output = await _collect_results(agent, scored)
         assert "Results with low confidence may not be directly relevant" not in output
+
+
+# ---------------------------------------------------------------------------
+# TASK-078/TASK-079: ResultRenderer improvements
+# ---------------------------------------------------------------------------
+
+
+from ember_agents.render import ResultRenderer, _url_label  # noqa: E402
+from ember_agents.trace import ExecutionTrace  # noqa: E402
+
+
+def _make_trace() -> ExecutionTrace:
+    """Build a minimal ExecutionTrace for renderer tests."""
+    return ExecutionTrace(
+        query_type="general",
+        extracted_signals={},
+        resolved_classifications={},
+        gate_outcome="passed",
+        source_statuses=[],
+        duration_seconds=0.1,
+    )
+
+
+@dataclass
+class _PatentStub:
+    country_code: str = "US"
+    country_name: str = "United States"
+    publication_number: str | None = None
+    expiry_date: str | None = None
+    expiry_date_approximate: bool = False
+    status: str = "active"
+    url: str | None = None
+
+
+@dataclass
+class _ResultStub:
+    drug_name: str | None = None
+    target: str | None = None
+    display_label: str | None = None
+    overall_score: float | None = None
+    semantic_score: float | None = None
+    structured_score: float | None = None
+    evidence_score: float | None = None
+    indication: list | None = None
+    synthesis_summary: str | None = None
+    risk_flags: list = field(default_factory=list)
+    patents: list = field(default_factory=list)
+    trials: list = field(default_factory=list)
+    trial_count: int | None = None
+    latest_trial_phase: str | None = None
+    articles: list = field(default_factory=list)
+    article_count: int | None = None
+    annual_revenue_usd_millions: float | None = None
+    revenue_year: int | None = None
+    biosimilar_competitors: list = field(default_factory=list)
+    biosimilar_competitor_count: int | None = None
+    source_urls: list = field(default_factory=list)
+
+
+class TestScoreBreakdown:
+    """TASK-079: Score breakdown line rendered when sub-scores present."""
+
+    def test_all_subscores_rendered(self):
+        renderer = ResultRenderer()
+        result = _ResultStub(
+            drug_name="Adalimumab",
+            semantic_score=0.85,
+            structured_score=0.72,
+            evidence_score=0.91,
+        )
+        output = renderer.render(_make_trace(), [result])
+        assert "**Scores:**" in output
+        assert "semantic: 0.85" in output
+        assert "structured: 0.72" in output
+        assert "evidence: 0.91" in output
+
+    def test_partial_subscores_only_show_present(self):
+        renderer = ResultRenderer()
+        result = _ResultStub(
+            drug_name="Bevacizumab",
+            semantic_score=None,
+            structured_score=0.60,
+            evidence_score=None,
+        )
+        output = renderer.render(_make_trace(), [result])
+        assert "structured: 0.60" in output
+        assert "semantic:" not in output
+        assert "evidence:" not in output
+
+    def test_all_none_subscores_omit_line(self):
+        renderer = ResultRenderer()
+        result = _ResultStub(
+            drug_name="TestDrug",
+            semantic_score=None,
+            structured_score=None,
+            evidence_score=None,
+        )
+        output = renderer.render(_make_trace(), [result])
+        assert "**Scores:**" not in output
+
+
+class TestPatentUrlColumn:
+    """TASK-079: Patent table includes Link column with URLs and approximate date marker."""
+
+    def test_patent_url_rendered_in_table(self):
+        renderer = ResultRenderer()
+        patent = _PatentStub(
+            country_name="United States",
+            expiry_date="2028-06-15",
+            url="https://patents.google.com/patent/US1234567",
+        )
+        result = _ResultStub(drug_name="DrugX", patents=[patent])
+        output = renderer.render(_make_trace(), [result])
+        assert "[Patent](https://patents.google.com/patent/US1234567)" in output
+        assert "Link" in output
+
+    def test_approximate_expiry_shows_estimated_marker(self):
+        renderer = ResultRenderer()
+        patent = _PatentStub(
+            country_name="Germany",
+            expiry_date="2027-03-01",
+            expiry_date_approximate=True,
+            url="https://patents.google.com/patent/DE9876543",
+        )
+        result = _ResultStub(drug_name="DrugY", patents=[patent])
+        output = renderer.render(_make_trace(), [result])
+        assert "~2027-03-01 (estimated)" in output
+
+    def test_no_url_patent_shows_empty_link_cell(self):
+        renderer = ResultRenderer()
+        patent = _PatentStub(country_name="Japan", expiry_date="2029-01-01", url=None)
+        result = _ResultStub(drug_name="DrugZ", patents=[patent])
+        output = renderer.render(_make_trace(), [result])
+        # Link column should still be present but empty
+        assert "| Link |" in output
+        assert "[Patent]" not in output
+
+
+class TestEvidenceCounts:
+    """TASK-079: Evidence counts with singular/plural; zero sections omitted."""
+
+    def test_trials_articles_patents_all_shown(self):
+        renderer = ResultRenderer()
+        result = _ResultStub(
+            drug_name="DrugA",
+            trial_count=3,
+            latest_trial_phase="Phase III",
+            article_count=5,
+            patents=[_PatentStub()],
+        )
+        output = renderer.render(_make_trace(), [result])
+        assert "3 trials (latest: Phase III)" in output
+        assert "5 articles" in output
+        assert "1 patent" in output
+
+    def test_singular_forms(self):
+        renderer = ResultRenderer()
+        result = _ResultStub(
+            drug_name="DrugB",
+            trial_count=1,
+            article_count=1,
+            patents=[_PatentStub()],
+        )
+        output = renderer.render(_make_trace(), [result])
+        assert "1 trial" in output
+        assert "1 trials" not in output
+        assert "1 article" in output
+        assert "1 articles" not in output
+        assert "1 patent" in output
+        assert "1 patents" not in output
+
+    def test_zero_sections_omitted(self):
+        renderer = ResultRenderer()
+        result = _ResultStub(
+            drug_name="DrugC",
+            trial_count=2,
+            article_count=0,
+            patents=[],
+        )
+        output = renderer.render(_make_trace(), [result])
+        assert "2 trials" in output
+        assert "article" not in output
+        assert "patent" not in output
+
+
+class TestCommercialRendering:
+    """TASK-079: Commercial line rendered when revenue present, omitted when None."""
+
+    def test_revenue_rendered_with_year(self):
+        renderer = ResultRenderer()
+        result = _ResultStub(
+            drug_name="Humira",
+            annual_revenue_usd_millions=20000.0,
+            revenue_year=2022,
+        )
+        output = renderer.render(_make_trace(), [result])
+        assert "**Commercial:**" in output
+        assert "Revenue: $20,000M (2022)" in output
+
+    def test_revenue_with_biosimilar_count(self):
+        renderer = ResultRenderer()
+        result = _ResultStub(
+            drug_name="Herceptin",
+            annual_revenue_usd_millions=7500.5,
+            revenue_year=2021,
+            biosimilar_competitor_count=4,
+        )
+        output = renderer.render(_make_trace(), [result])
+        assert "Revenue: $7,500M (2021)" in output
+        assert "Biosimilars: 4 approved" in output
+
+    def test_no_revenue_omits_commercial_line(self):
+        renderer = ResultRenderer()
+        result = _ResultStub(drug_name="DrugNoRevenue", annual_revenue_usd_millions=None)
+        output = renderer.render(_make_trace(), [result])
+        assert "**Commercial:**" not in output
+
+
+class TestSourceLinks:
+    """TASK-079: Source URLs rendered as markdown links with domain-derived labels."""
+
+    def test_known_domains_get_canonical_labels(self):
+        assert _url_label("https://pubmed.ncbi.nlm.nih.gov/12345678/") == "PubMed"
+        assert _url_label("https://clinicaltrials.gov/ct2/show/NCT01234567") == "ClinicalTrials.gov"
+        assert _url_label("https://patents.google.com/patent/US1234567") == "Google Patents"
+        assert _url_label("https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm") == "DailyMed"
+        assert _url_label("https://www.fda.gov/drugs/whatever") == "FDA"
+
+    def test_unknown_domain_capitalizes_first_part(self):
+        label = _url_label("https://example.com/some/path")
+        assert label == "Example"
+
+    def test_source_urls_rendered_in_output(self):
+        renderer = ResultRenderer()
+        result = _ResultStub(
+            drug_name="Rituximab",
+            source_urls=[
+                "https://pubmed.ncbi.nlm.nih.gov/99999999/",
+                "https://clinicaltrials.gov/ct2/show/NCT99999999",
+            ],
+        )
+        output = renderer.render(_make_trace(), [result])
+        assert "[PubMed](https://pubmed.ncbi.nlm.nih.gov/99999999/)" in output
+        assert "[ClinicalTrials.gov](https://clinicaltrials.gov/ct2/show/NCT99999999)" in output

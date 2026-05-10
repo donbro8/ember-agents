@@ -3,11 +3,59 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlparse
 
 from ember_agents.trace import ExecutionTrace
 
 if TYPE_CHECKING:
     pass
+
+# ---------------------------------------------------------------------------
+# URL label helper
+# ---------------------------------------------------------------------------
+
+_KNOWN_DOMAIN_LABELS: dict[str, str] = {
+    "pubmed.ncbi.nlm.nih.gov": "PubMed",
+    "clinicaltrials.gov": "ClinicalTrials.gov",
+    "patents.google.com": "Google Patents",
+    "dailymed.nlm.nih.gov": "DailyMed",
+    "fda.gov": "FDA",
+}
+
+
+def _url_label(url: str) -> str:
+    """Derive a human-readable label from a URL.
+
+    Maps known domains to canonical labels and falls back to capitalizing
+    the first part of the domain for unknown domains.
+
+    Args:
+        url: The URL to derive a label for.
+
+    Returns:
+        A human-readable label string.
+    """
+    try:
+        parsed = urlparse(url)
+        hostname = parsed.hostname or ""
+    except Exception:  # noqa: BLE001
+        return url
+
+    # Strip leading "www."
+    if hostname.startswith("www."):
+        hostname = hostname[4:]
+
+    if hostname in _KNOWN_DOMAIN_LABELS:
+        return _KNOWN_DOMAIN_LABELS[hostname]
+
+    # Check if any known domain is a suffix (e.g. subdomain of fda.gov)
+    for domain, label in _KNOWN_DOMAIN_LABELS.items():
+        if hostname == domain or hostname.endswith("." + domain):
+            return label
+
+    # Default: capitalize first part of domain
+    first_part = hostname.split(".")[0] if hostname else url
+    return first_part.capitalize() if first_part else url
 
 
 class ResultRenderer:
@@ -137,17 +185,89 @@ class ResultRenderer:
             if risk_flags:
                 lines.append(f"**Risk flags:** {', '.join(risk_flags)}")
 
+            # Score breakdown line
+            semantic_score = getattr(result, "semantic_score", None)
+            structured_score = getattr(result, "structured_score", None)
+            evidence_score = getattr(result, "evidence_score", None)
+            score_parts: list[str] = []
+            if semantic_score is not None:
+                score_parts.append(f"semantic: {semantic_score:.2f}")
+            if structured_score is not None:
+                score_parts.append(f"structured: {structured_score:.2f}")
+            if evidence_score is not None:
+                score_parts.append(f"evidence: {evidence_score:.2f}")
+            if score_parts:
+                lines.append(f"**Scores:** {', '.join(score_parts)}")
+
+            # Evidence counts line
+            trial_count = getattr(result, "trial_count", None)
+            if trial_count is None:
+                trials = getattr(result, "trials", None)
+                trial_count = len(trials) if trials is not None else 0
+
+            article_count = getattr(result, "article_count", None)
+            if article_count is None:
+                articles = getattr(result, "articles", None)
+                article_count = len(articles) if articles is not None else 0
+
+            patents = getattr(result, "patents", []) or []
+            patent_count = len(patents)
+
+            evidence_parts: list[str] = []
+            if trial_count:
+                latest_phase = getattr(result, "latest_trial_phase", None)
+                trial_str = f"{trial_count} trial{'s' if trial_count != 1 else ''}"
+                if latest_phase:
+                    trial_str += f" (latest: {latest_phase})"
+                evidence_parts.append(trial_str)
+            if article_count:
+                evidence_parts.append(f"{article_count} article{'s' if article_count != 1 else ''}")
+            if patent_count:
+                evidence_parts.append(f"{patent_count} patent{'s' if patent_count != 1 else ''}")
+            if evidence_parts:
+                lines.append(" · ".join(evidence_parts))
+
+            # Commercial line
+            annual_revenue = getattr(result, "annual_revenue_usd_millions", None)
+            if annual_revenue is not None:
+                revenue_year = getattr(result, "revenue_year", None)
+                revenue_int = int(annual_revenue)
+                revenue_formatted = f"${revenue_int:,}M"
+                if revenue_year:
+                    revenue_formatted += f" ({revenue_year})"
+                biosimilar_count = getattr(result, "biosimilar_competitor_count", None)
+                if biosimilar_count is None:
+                    biosimilar_competitors = getattr(result, "biosimilar_competitors", None)
+                    biosimilar_count = len(biosimilar_competitors) if biosimilar_competitors else 0
+                commercial_parts = [f"Revenue: {revenue_formatted}"]
+                if biosimilar_count:
+                    commercial_parts.append(f"Biosimilars: {biosimilar_count} approved")
+                lines.append(f"**Commercial:** {' · '.join(commercial_parts)}")
+
             # Patent jurisdictions
-            patents = getattr(result, "patents", [])
             if patents:
                 lines.append("\n**Patent jurisdictions:**")
-                lines.append("| Jurisdiction | Expiry | Status |")
-                lines.append("|---|---|---|")
+                lines.append("| Jurisdiction | Expiry | Status | Link |")
+                lines.append("|---|---|---|---|")
                 for patent in patents:
                     country = getattr(patent, "country_name", None) or getattr(patent, "country_code", "")
                     expiry = getattr(patent, "expiry_date", None)
-                    expiry_str = str(expiry) if expiry else "N/A"
+                    expiry_approximate = getattr(patent, "expiry_date_approximate", False)
+                    if expiry:
+                        expiry_str = str(expiry)
+                        if expiry_approximate:
+                            expiry_str = f"~{expiry_str} (estimated)"
+                    else:
+                        expiry_str = "N/A"
                     status = getattr(patent, "status", "unknown")
-                    lines.append(f"| {country} | {expiry_str} | {status} |")
+                    patent_url = getattr(patent, "url", None)
+                    link_str = f"[Patent]({patent_url})" if patent_url else ""
+                    lines.append(f"| {country} | {expiry_str} | {status} | {link_str} |")
+
+            # Source URLs
+            source_urls = getattr(result, "source_urls", None) or []
+            if source_urls:
+                url_links = [f"[{_url_label(url)}]({url})" for url in source_urls]
+                lines.append(f"**Sources:** {' · '.join(url_links)}")
 
         return "\n".join(lines)
