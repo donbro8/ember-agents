@@ -157,10 +157,10 @@ class TestBiologicSeedSourceInit:
         with pytest.raises(FileNotFoundError):
             BiologicSeedSource(tmp_path / "nonexistent.json")
 
-    def test_non_array_json_raises(self, tmp_path: Path) -> None:
+    def test_dict_without_entries_key_raises(self, tmp_path: Path) -> None:
         bad = tmp_path / "bad.json"
         bad.write_text('{"key": "value"}', encoding="utf-8")
-        with pytest.raises(ValueError, match="Expected a JSON array"):
+        with pytest.raises(ValueError, match="Expected 'entries' key with a list"):
             BiologicSeedSource(bad)
 
 
