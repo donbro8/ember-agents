@@ -229,7 +229,7 @@ class ResultRenderer:
 
             # Commercial line
             annual_revenue = getattr(result, "annual_revenue_usd_millions", None)
-            if annual_revenue is not None:
+            if annual_revenue is not None and annual_revenue > 0:
                 revenue_year = getattr(result, "revenue_year", None)
                 revenue_int = int(annual_revenue)
                 revenue_formatted = f"${revenue_int:,}M"

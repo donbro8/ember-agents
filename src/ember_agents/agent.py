@@ -121,12 +121,16 @@ def _candidate_to_result(scored: Any) -> Any:
         if PatentJurisdiction is not None and isinstance(p, PatentJurisdiction):
             patent_jurisdictions.append(p)
 
-    # Source provenance names
+    # Source provenance names and URLs
     sources: list[str] = []
+    source_urls: list[str] = []
     for prov in getattr(cand, "contributing_sources", []) or []:
         name = getattr(prov, "source_name", None) or getattr(prov, "source_url", None)
         if name and name not in sources:
             sources.append(str(name))
+        url = getattr(prov, "source_url", None)
+        if url and str(url) not in source_urls:
+            source_urls.append(str(url))
 
     # Synthesis summary
     synthesis: str | None = getattr(cand, "synthesis_summary", None)
@@ -224,6 +228,7 @@ def _candidate_to_result(scored: Any) -> Any:
             patents=patent_jurisdictions,
             overall_score=overall_score,
             sources_contributed=sources,
+            source_urls=source_urls,
             risk_flags=risk_flags,
             synthesis_summary=synthesis,
             structured_score=structured_score,
@@ -262,6 +267,7 @@ def _candidate_to_result(scored: Any) -> Any:
     r.patents = patent_jurisdictions  # type: ignore[attr-defined]
     r.overall_score = overall_score  # type: ignore[attr-defined]
     r.sources_contributed = sources  # type: ignore[attr-defined]
+    r.source_urls = source_urls  # type: ignore[attr-defined]
     r.risk_flags = risk_flags  # type: ignore[attr-defined]
     r.synthesis_summary = synthesis  # type: ignore[attr-defined]
     r.indication = indication  # type: ignore[attr-defined]
