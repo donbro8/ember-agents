@@ -104,7 +104,7 @@ def _make_drug_result(
     score: float = 0.85,
     sources: list[str] | None = None,
     include_patents: bool = True,
-    indication: str | None = None,
+    indication: list[str] | None = None,
 ) -> "CandidateResult":
     """Build a realistic DRUG CandidateResult."""
     pjs = []
@@ -159,19 +159,19 @@ def _build_results() -> None:
             "adalimumab",
             score=0.95,
             sources=["bigquery_patents", "bigquery_fda", "clinicaltrials"],
-            indication="Rheumatoid arthritis",
+            indication=["Rheumatoid arthritis"],
         ),
         _make_drug_result(
             "adalimumab-atto",
             score=0.82,
             sources=["bigquery_fda"],
-            indication="Rheumatoid arthritis",
+            indication=["Rheumatoid arthritis"],
         ),
         _make_drug_result(
             "adalimumab-adbm",
             score=0.79,
             sources=["bigquery_fda"],
-            indication="Rheumatoid arthritis",
+            indication=["Rheumatoid arthritis"],
         ),
     ]
 
@@ -180,19 +180,19 @@ def _build_results() -> None:
             "pembrolizumab",
             score=0.91,
             sources=["bigquery_patents", "clinicaltrials"],
-            indication="Non-small cell lung cancer",
+            indication=["Non-small cell lung cancer"],
         ),
         _make_drug_result(
             "nivolumab",
             score=0.88,
             sources=["bigquery_patents", "clinicaltrials"],
-            indication="Melanoma",
+            indication=["Melanoma"],
         ),
         _make_drug_result(
             "cemiplimab",
             score=0.72,
             sources=["bigquery_patents"],
-            indication="Cutaneous squamous cell carcinoma",
+            indication=["Cutaneous squamous cell carcinoma"],
         ),
     ]
 
@@ -201,25 +201,25 @@ def _build_results() -> None:
             "trastuzumab",
             score=0.93,
             sources=["bigquery_fda", "bigquery_patents"],
-            indication="HER2-positive breast cancer",
+            indication=["HER2-positive breast cancer"],
         ),
         _make_drug_result(
             "bevacizumab",
             score=0.89,
             sources=["bigquery_fda", "bigquery_patents"],
-            indication="Colorectal cancer",
+            indication=["Colorectal cancer"],
         ),
         _make_drug_result(
             "rituximab",
             score=0.87,
             sources=["bigquery_fda"],
-            indication="Non-Hodgkin lymphoma",
+            indication=["Non-Hodgkin lymphoma"],
         ),
         _make_drug_result(
             "infliximab",
             score=0.84,
             sources=["bigquery_fda", "bigquery_patents"],
-            indication="Crohn's disease",
+            indication=["Crohn's disease"],
         ),
     ]
 
@@ -228,13 +228,13 @@ def _build_results() -> None:
             "trastuzumab",
             score=0.96,
             sources=["bigquery_patents", "clinicaltrials", "pubmed"],
-            indication="HER2-positive breast cancer",
+            indication=["HER2-positive breast cancer"],
         ),
         _make_drug_result(
             "pertuzumab",
             score=0.90,
             sources=["bigquery_patents", "clinicaltrials"],
-            indication="HER2-positive breast cancer",
+            indication=["HER2-positive breast cancer"],
         ),
         _make_target_result(
             "HER2",
@@ -248,13 +248,13 @@ def _build_results() -> None:
             "etanercept",
             score=0.97,
             sources=["bigquery_patents", "bigquery_fda"],
-            indication="Rheumatoid arthritis",
+            indication=["Rheumatoid arthritis"],
         ),
         _make_drug_result(
             "etanercept-szzs",
             score=0.81,
             sources=["bigquery_fda"],
-            indication="Rheumatoid arthritis",
+            indication=["Rheumatoid arthritis"],
         ),
     ]
 
@@ -263,7 +263,7 @@ def _build_results() -> None:
             "bevacizumab",
             score=0.92,
             sources=["bigquery_patents", "pubmed"],
-            indication="Colorectal cancer",
+            indication=["Colorectal cancer"],
         ),
         _make_target_result(
             "VEGF-A",
@@ -274,7 +274,7 @@ def _build_results() -> None:
             "ranibizumab",
             score=0.76,
             sources=["bigquery_patents"],
-            indication="Wet age-related macular degeneration",
+            indication=["Wet age-related macular degeneration"],
         ),
     ]
 

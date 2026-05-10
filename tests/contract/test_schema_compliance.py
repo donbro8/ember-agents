@@ -276,8 +276,8 @@ class TestCanonicalIdStability:
             fda_generic_name="Adalimumab",
             sources_contributed=["bigquery_fda"],
         )
-        # _normalize strips whitespace and lowercases
-        assert result.canonical_id == "adalimumab"
+        # _normalize strips whitespace and lowercases; tier-1 uses fda: prefix
+        assert result.canonical_id == "fda:adalimumab"
 
     def test_canonical_id_stable_across_multiple_instances(self) -> None:
         """Same inputs always produce the same canonical_id."""
@@ -313,7 +313,7 @@ class TestCanonicalIdStability:
             target=adalimumab["target_antigen"],
             sources_contributed=["biologic_seed"],
         )
-        assert result.canonical_id == "adalimumab"
+        assert result.canonical_id == "fda:adalimumab"
 
 
 # ---------------------------------------------------------------------------
