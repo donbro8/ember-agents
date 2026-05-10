@@ -153,12 +153,23 @@ def _entry_to_fetch_result(entry: Any) -> FetchResult:
     if _EMBER_DATA_AVAILABLE and seed_entry_to_patent_jurisdictions is not None:
         patents = seed_entry_to_patent_jurisdictions(entry)
 
+    brand_names: list[str] = list(getattr(entry, "brand_names", []) or [])
+
     return FetchResult(
         drug_name=entry.drug_name,
-        synonyms=list(getattr(entry, "brand_names", [])),
+        synonyms=brand_names,
         target_id="",
         patents=patents,
         matched_dimensions=[_SOURCE_NAME],
+        brand_names=brand_names,
+        originator=getattr(entry, "originator", "") or "",
+        modality=getattr(entry, "modality", "") or "",
+        category=getattr(entry, "category", "") or "",
+        annual_revenue_usd_millions=getattr(entry, "annual_revenue_usd_millions", None),
+        revenue_year=getattr(entry, "revenue_year", None),
+        biosimilar_competitors=list(getattr(entry, "biosimilar_competitors", []) or []),
+        has_approved_biosimilar=getattr(entry, "has_approved_biosimilar", False) or False,
+        indications=list(getattr(entry, "indications", []) or []),
     )
 
 

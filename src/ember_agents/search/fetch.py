@@ -191,6 +191,20 @@ class FetchResult:
         articles: Article records from this source.
         provenance: Source provenance for every data element from this result.
         matched_dimensions: Which SearchSpec dimensions this result matched.
+        brand_names: Known brand/trade names for this drug.
+        originator: Original developer / innovator company.
+        modality: Drug modality (e.g. monoclonal antibody, small molecule).
+        category: High-level drug category (e.g. biologic, biosimilar).
+        annual_revenue_usd_millions: Reported annual revenue in USD millions.
+        revenue_year: Year corresponding to annual_revenue_usd_millions.
+        biosimilar_competitors: Names of known biosimilar competitors.
+        has_approved_biosimilar: Whether an approved biosimilar exists.
+        indications: Approved or studied indications.
+        fda_generic_name: FDA-assigned generic (INN) name.
+        fda_brand_name: FDA-assigned brand name.
+        fda_manufacturer: FDA-listed manufacturer.
+        fda_therapeutic_area: FDA therapeutic area classification.
+        target_aliases: Alternative names/aliases for the biological target.
     """
 
     drug_name: str = ""
@@ -202,6 +216,20 @@ class FetchResult:
     articles: list = field(default_factory=list)
     provenance: list = field(default_factory=list)
     matched_dimensions: list[str] = field(default_factory=list)
+    brand_names: list[str] = field(default_factory=list)
+    originator: str = ""
+    modality: str = ""
+    category: str = ""
+    annual_revenue_usd_millions: float | None = None
+    revenue_year: int | None = None
+    biosimilar_competitors: list[str] = field(default_factory=list)
+    has_approved_biosimilar: bool = False
+    indications: list[str] = field(default_factory=list)
+    fda_generic_name: str = ""
+    fda_brand_name: str = ""
+    fda_manufacturer: str = ""
+    fda_therapeutic_area: str = ""
+    target_aliases: list[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
