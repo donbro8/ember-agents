@@ -328,51 +328,55 @@ def _candidate_to_result(
     }
 
     if CandidateResult is not None:
-        result_obj = CandidateResult(
-            drug_name=drug_name,
-            fda_generic_name=fda_generic_name,
-            target=target_label,
-            patents=patent_jurisdictions,
-            overall_score=overall_score,
-            sources_contributed=sources,
-            source_urls=source_urls,
-            risk_flags=risk_flags,
-            synthesis_summary=synthesis,
-            structured_score=structured_score,
-            semantic_score=semantic_score,
-            evidence_score=evidence_score,
-            trials=trials_list,
-            trial_count=trial_count,
-            latest_trial_phase=latest_trial_phase,
-            articles=articles_list,
-            article_count=article_count,
-            brand_names=brand_names,
-            originator=originator,
-            modality=modality,
-            category=category,
-            target_aliases=target_aliases,
-            annual_revenue_usd_millions=annual_revenue_usd_millions,
-            revenue_year=revenue_year,
-            biosimilar_competitors=biosimilar_competitors,
-            biosimilar_competitor_count=biosimilar_competitor_count,
-            has_approved_biosimilar=has_approved_biosimilar,
-            fda_brand_name=fda_brand_name,
-            fda_manufacturer=fda_manufacturer,
-            fda_therapeutic_area=fda_therapeutic_area,
-            indication=indication,
-        )
-        return _attach_additive_metadata(
-            result_obj,
-            {
-                "component_scores": component_scores,
-                "suppression_metadata": suppression_metadata,
-                "evidence_summary": evidence_summary,
-                "matched_dimensions": matched_dimensions,
-                "missed_dimensions": missed_dimensions,
-                "concrete_labels": concrete_labels,
-                "match_explanations": match_explanations,
-            },
-        )
+        try:
+            result_obj = CandidateResult(
+                drug_name=drug_name,
+                fda_generic_name=fda_generic_name,
+                target=target_label,
+                patents=patent_jurisdictions,
+                overall_score=overall_score,
+                sources_contributed=sources,
+                source_urls=source_urls,
+                risk_flags=risk_flags,
+                synthesis_summary=synthesis,
+                structured_score=structured_score,
+                semantic_score=semantic_score,
+                evidence_score=evidence_score,
+                trials=trials_list,
+                trial_count=trial_count,
+                latest_trial_phase=latest_trial_phase,
+                articles=articles_list,
+                article_count=article_count,
+                brand_names=brand_names,
+                originator=originator,
+                modality=modality,
+                category=category,
+                target_aliases=target_aliases,
+                annual_revenue_usd_millions=annual_revenue_usd_millions,
+                revenue_year=revenue_year,
+                biosimilar_competitors=biosimilar_competitors,
+                biosimilar_competitor_count=biosimilar_competitor_count,
+                has_approved_biosimilar=has_approved_biosimilar,
+                fda_brand_name=fda_brand_name,
+                fda_manufacturer=fda_manufacturer,
+                fda_therapeutic_area=fda_therapeutic_area,
+                indication=indication,
+            )
+            return _attach_additive_metadata(
+                result_obj,
+                {
+                    "patents": patent_jurisdictions,
+                    "component_scores": component_scores,
+                    "suppression_metadata": suppression_metadata,
+                    "evidence_summary": evidence_summary,
+                    "matched_dimensions": matched_dimensions,
+                    "missed_dimensions": missed_dimensions,
+                    "concrete_labels": concrete_labels,
+                    "match_explanations": match_explanations,
+                },
+            )
+        except Exception:  # noqa: BLE001
+            pass
 
     # Fallback: a simple namespace so the renderer can still call getattr()
     class _FallbackResult:

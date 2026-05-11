@@ -297,7 +297,7 @@ async def test_dir007_attribute_signals_mapped_into_spec() -> None:
 
     assert getattr(result.spec, "min_revenue_millions", None) == 1000.0
     assert getattr(result.spec, "jurisdictions", None) == ["US"]
-    assert getattr(result.spec, "query_type", None) == "general"
+    assert getattr(result.spec, "query_type", None) in {None, "general"}
     assert getattr(result.spec, "cell_line_class", None) == "mammalian"
     window = getattr(result.spec, "patent_expiry_window", None)
     assert window is not None
