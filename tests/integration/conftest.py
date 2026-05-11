@@ -116,19 +116,26 @@ def _make_drug_result(
             _make_patent_jurisdiction("US", "United States", 2028),
             _make_patent_jurisdiction("EP", "European Patent Office", 2027),
         ]
-    return CandidateResult(
-        drug_name=drug_name,
-        patents=pjs,
-        overall_score=score,
-        sources_contributed=sources or ["bigquery_patents", "bigquery_fda"],
-        source_urls=[
+    kwargs = {
+        "drug_name": drug_name,
+        "patents": pjs,
+        "overall_score": score,
+        "sources_contributed": sources or ["bigquery_patents", "bigquery_fda"],
+        "source_urls": [
             "https://patents.google.com/patent/US12345678",
             f"https://www.fda.gov/drugs/drug-approvals-and-databases/{drug_name.lower()}",
         ],
-        indication=indication,
-        mechanism_of_action="Monoclonal antibody",
-        clinical_stage="Approved",
-    )
+        "indication": indication,
+        "mechanism_of_action": "Monoclonal antibody",
+        "clinical_stage": "Approved",
+    }
+    try:
+        return CandidateResult(**kwargs)
+    except Exception:
+        if isinstance(indication, list):
+            kwargs["indication"] = ", ".join(indication)
+            return CandidateResult(**kwargs)
+        raise
 
 
 def _make_target_result(
