@@ -169,6 +169,8 @@ def _candidate_to_result(
     for p in getattr(cand, "patents", []) or []:
         if PatentJurisdiction is not None and isinstance(p, PatentJurisdiction):
             patent_jurisdictions.append(p)
+        elif all(hasattr(p, attr) for attr in ("country_code", "status", "url")):
+            patent_jurisdictions.append(p)
 
     # Source provenance names and URLs
     sources: list[str] = []
