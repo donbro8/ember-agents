@@ -21,6 +21,7 @@ This is phase-5 of the dynamic search pipeline.
 from __future__ import annotations
 
 import hashlib
+import re
 import unicodedata
 import uuid
 from dataclasses import dataclass, field
@@ -144,6 +145,19 @@ _MAX_TRIALS: int = 10
 _MAX_PATENTS: int = 10
 _MAX_ARTICLES: int = 10
 
+# Minimum denominator used for structured-score normalisation when exactly one
+# scoring dimension is active, preventing accidental single-signal perfect hits
+# from over-ranking stronger multi-dimensional candidates.
+_STRUCTURED_ONE_DIM_FLOOR: int = 2
+
+# Per-query-type suppression threshold for low-confidence candidates.
+_QUERY_TYPE_MIN_OVERALL: dict[str, float] = {
+    "biosimilar_screen": 0.45,
+    "drug_lookup": 0.35,
+    "opportunity_scan": 0.25,
+    "general": 0.20,
+}
+
 
 # ---------------------------------------------------------------------------
 # ScoredCandidate — annotated output type
@@ -169,6 +183,18 @@ class ScoredCandidate:
     evidence_score: float = 0.0
     overall_score: float = 0.0
     rank: int = 0
+    suppressed: bool = False
+
+
+@dataclass
+class ScoreSummary:
+    """Summary metadata for the last score() call."""
+
+    query_type: str | None
+    threshold: float
+    total_candidates: int
+    returned_candidates: int
+    suppressed_candidates: int
 
 
 # ---------------------------------------------------------------------------
@@ -181,6 +207,59 @@ def _normalize(text: str | None) -> str:
     if not text:
         return ""
     return unicodedata.normalize("NFC", text).lower().strip()
+
+
+def _tokenize(text: str | None) -> tuple[str, ...]:
+    """Split text into lowercase alphanumeric tokens."""
+    norm = _normalize(text)
+    if not norm:
+        return ()
+    return tuple(tok for tok in re.findall(r"[a-z0-9]+", norm) if tok)
+
+
+def _phrase_match(needle: str, haystack: str) -> bool:
+    """True when all *needle* tokens appear contiguously in *haystack*."""
+    needle_tokens = _tokenize(needle)
+    haystack_tokens = _tokenize(haystack)
+    if not needle_tokens or not haystack_tokens:
+        return False
+    n = len(needle_tokens)
+    for i in range(0, len(haystack_tokens) - n + 1):
+        if haystack_tokens[i : i + n] == needle_tokens:
+            return True
+    return False
+
+
+def _single_token_match(needle: str, haystack: str) -> bool:
+    """True when a single-token label exists as a whole token in haystack."""
+    needle_tokens = _tokenize(needle)
+    if len(needle_tokens) != 1:
+        return False
+    haystack_tokens = set(_tokenize(haystack))
+    return needle_tokens[0] in haystack_tokens
+
+
+def _collect_candidate_indication_texts(candidate: Any) -> list[str]:
+    texts: list[str] = []
+    for dim in list(getattr(candidate, "matched_dimensions", []) or []):
+        if dim:
+            texts.append(str(dim))
+
+    indication_field = getattr(candidate, "indication", None)
+    if indication_field:
+        if isinstance(indication_field, list):
+            texts.extend(str(v) for v in indication_field if v)
+        else:
+            texts.append(str(indication_field))
+
+    for trial in list(getattr(candidate, "trials", []) or []):
+        cond = getattr(trial, "condition", None) or getattr(trial, "conditions", None)
+        if cond:
+            if isinstance(cond, list):
+                texts.extend(str(c) for c in cond if c)
+            else:
+                texts.append(str(cond))
+    return texts
 
 
 def _collection_name(search_id: str) -> str:
@@ -392,6 +471,7 @@ def _score_structured(
     alternative name forms are treated as matches.
     """
     signals: list[float] = []
+    active_dimensions = 0
 
     # --- Drug name match ---
     drug_name_norm = _normalize(getattr(candidate, "drug_name", None))
@@ -406,12 +486,14 @@ def _score_structured(
         if n
     ]
     if spec_drug_names:
+        active_dimensions += 1
         hit = 1.0 if canonical_drug and canonical_drug in spec_drug_names else 0.0
         signals.append(hit)
 
     # --- Target match ---
     spec_target = getattr(spec, "target", None)
     if spec_target is not None:
+        active_dimensions += 1
         spec_target_labels: set[str] = set()
         for attr in ("label", "identifier", "value"):
             val = getattr(spec_target, attr, None)
@@ -449,30 +531,22 @@ def _score_structured(
                 break
 
     if spec_indications:
-        cand_dims = {_normalize(d) for d in (getattr(candidate, "matched_dimensions", []) or [])}
+        active_dimensions += 1
+        candidate_texts = _collect_candidate_indication_texts(candidate)
         ind_hit = 0.0
         for ind_label in spec_indications:
-            if ind_label in cand_dims or any(ind_label in dim for dim in cand_dims):
-                ind_hit = 1.0
-                break
-        # Also check trial condition fields
-        if ind_hit == 0.0:
-            for trial in list(getattr(candidate, "trials", []) or []):
-                cond = getattr(trial, "condition", None) or getattr(trial, "conditions", None)
-                if cond:
-                    cond_str = " ".join(str(c) for c in cond) if isinstance(cond, list) else str(cond)
-                    cond_norm = _normalize(cond_str)
-                    for ind_label in spec_indications:
-                        if ind_label in cond_norm:
-                            ind_hit = 1.0
-                            break
-                if ind_hit == 1.0:
+            for cand_text in candidate_texts:
+                if _phrase_match(ind_label, cand_text) or _single_token_match(ind_label, cand_text):
+                    ind_hit = 1.0
                     break
+            if ind_hit == 1.0:
+                break
         signals.append(ind_hit)
 
     # --- Therapeutic area match ---
     spec_ta = getattr(spec, "therapeutic_area", None)
     if spec_ta is not None:
+        active_dimensions += 1
         spec_ta_labels: set[str] = set()
         for attr in ("label", "identifier", "value"):
             val = getattr(spec_ta, attr, None)
@@ -480,17 +554,24 @@ def _score_structured(
                 spec_ta_labels.add(_resolve_name_via_synonyms(_normalize(val), atc_table, uniprot_table))
 
         ta_hit = 0.0
-        if canonical_drug and spec_ta_labels:
+        candidate_texts = _collect_candidate_indication_texts(candidate)
+        if spec_ta_labels and candidate_texts:
             for ta_label in spec_ta_labels:
-                if ta_label in canonical_drug or canonical_drug in ta_label:
-                    ta_hit = 1.0
+                for cand_text in candidate_texts:
+                    if _phrase_match(ta_label, cand_text) or _single_token_match(ta_label, cand_text):
+                        ta_hit = 1.0
+                        break
+                if ta_hit == 1.0:
                     break
         signals.append(ta_hit)
 
-    if not signals:
+    if active_dimensions == 0:
         return 0.0
+    denominator = active_dimensions
+    if active_dimensions == 1:
+        denominator = max(denominator, _STRUCTURED_ONE_DIM_FLOOR)
 
-    return sum(signals) / len(signals)
+    return sum(signals) / denominator
 
 
 def _score_evidence(candidate: Any) -> float:
@@ -682,6 +763,13 @@ class MatchScorer:
 
         self._atc_table: dict[str, str] = _build_atc_synonym_table(self._atc)
         self._uniprot_table: dict[str, str] = _build_uniprot_alias_table()
+        self.last_score_summary = ScoreSummary(
+            query_type=None,
+            threshold=0.0,
+            total_candidates=0,
+            returned_candidates=0,
+            suppressed_candidates=0,
+        )
 
     # ------------------------------------------------------------------
     # Public API
@@ -719,7 +807,15 @@ class MatchScorer:
         List of :class:`ScoredCandidate` objects sorted by ``overall_score``
         descending, with 1-based ``rank`` assigned.
         """
+        threshold = _QUERY_TYPE_MIN_OVERALL.get(query_type or "", 0.0)
         if not candidates:
+            self.last_score_summary = ScoreSummary(
+                query_type=query_type,
+                threshold=threshold,
+                total_candidates=0,
+                returned_candidates=0,
+                suppressed_candidates=0,
+            )
             return []
 
         # Resolve per-query-type weights
@@ -788,11 +884,22 @@ class MatchScorer:
                     structured_score=round(structured, 6),
                     evidence_score=round(evidence, 6),
                     overall_score=round(overall, 6),
+                    suppressed=overall < threshold,
                 )
             )
 
         # Sort by overall score descending, then by candidate id for determinism
         scored.sort(key=lambda sc: (-sc.overall_score, str(getattr(sc.candidate, "id", ""))))
+
+        suppressed_count = sum(1 for sc in scored if sc.suppressed)
+
+        self.last_score_summary = ScoreSummary(
+            query_type=query_type,
+            threshold=threshold,
+            total_candidates=len(candidates),
+            returned_candidates=len(scored),
+            suppressed_candidates=suppressed_count,
+        )
 
         # Assign 1-based ranks
         for i, sc in enumerate(scored, start=1):

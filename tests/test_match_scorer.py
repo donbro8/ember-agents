@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 
 from ember_agents.search.match import (
     MatchScorer,
+    ScoreSummary,
     ScoredCandidate,
     _build_candidate_document,
     _build_query_document,
@@ -74,6 +75,13 @@ class FakeIndication:
     label: str = "Breast Cancer"
     identifier: str = "D001943"
     value: str = "Breast Cancer"
+
+
+@dataclass
+class FakeTherapeuticArea:
+    label: str = "Oncology"
+    identifier: str = "L01"
+    value: str = "Oncology"
 
 
 @dataclass
@@ -687,6 +695,126 @@ async def test_end_to_end_scoring_single_candidate() -> None:
     assert result[0].rank == 1
     assert result[0].candidate is cand
     assert result[0].overall_score >= 0.0
+
+
+def test_score_structured_indication_does_not_match_embedded_substring() -> None:
+    cand = _make_candidate(matched_dimensions=["metastatic colorectal carcinoma"])
+    spec = FakeSpec(indications=[FakeIndication(label="crc")])
+    score = _score_structured(cand, spec, {}, {})
+    assert score == 0.0
+
+
+def test_score_structured_therapeutic_area_phrase_match() -> None:
+    cand = _make_candidate(matched_dimensions=["breast cancer", "oncology"])
+    spec = FakeSpec(therapeutic_area=FakeIndication(label="breast cancer"))
+    score = _score_structured(cand, spec, {}, {})
+    assert score > 0.0
+
+
+def test_score_structured_one_of_one_uses_denominator_floor() -> None:
+    cand = _make_candidate(drug_name="trastuzumab")
+    spec = FakeSpec(drug_names=["trastuzumab"])
+    score = _score_structured(cand, spec, {}, {})
+    assert score == 0.5
+
+
+def test_score_structured_one_of_four() -> None:
+    cand = _make_candidate(drug_name="trastuzumab")
+    spec = FakeSpec(
+        drug_names=["trastuzumab"],
+        target=FakeTarget(label="EGFR"),
+        therapeutic_area=FakeTherapeuticArea(label="oncology"),
+        indications=[FakeIndication(label="melanoma")],
+    )
+    score = _score_structured(cand, spec, {}, {})
+    assert score == 0.25
+
+
+def test_score_structured_three_of_four() -> None:
+    cand = _make_candidate(
+        drug_name="trastuzumab",
+        target=FakeTarget(label="HER2"),
+        matched_dimensions=["breast cancer"],
+    )
+    spec = FakeSpec(
+        drug_names=["trastuzumab"],
+        target=FakeTarget(label="HER2"),
+        therapeutic_area=FakeTherapeuticArea(label="oncology"),
+        indications=[FakeIndication(label="breast cancer")],
+    )
+    score = _score_structured(cand, spec, {}, {})
+    assert score == 0.75
+
+
+def test_score_structured_missing_data_keeps_explicit_mismatches() -> None:
+    cand = _make_candidate(drug_name=None, target=None, matched_dimensions=[])
+    spec = FakeSpec(
+        drug_names=["trastuzumab"],
+        target=FakeTarget(label="HER2"),
+        therapeutic_area=FakeIndication(label="oncology"),
+        indications=[FakeIndication(label="breast cancer")],
+    )
+    score = _score_structured(cand, spec, {}, {})
+    assert score == 0.0
+
+
+async def test_score_suppresses_low_confidence_by_query_type() -> None:
+    scorer = _make_scorer()
+    candidates = [
+        _make_candidate(drug_name="matched", trials=[FakeTrial() for _ in range(10)]),
+        _make_candidate(drug_name="weak"),
+    ]
+    spec = FakeSpec(drug_names=["matched"])
+
+    result = await scorer.score(candidates, spec, query_type="drug_lookup")
+    assert len(result) == 2
+    suppressed = [sc for sc in result if sc.suppressed]
+    assert suppressed
+    assert isinstance(scorer.last_score_summary, ScoreSummary)
+    assert scorer.last_score_summary.suppressed_candidates >= 1
+    assert scorer.last_score_summary.threshold > 0.0
+
+
+async def test_score_returns_all_candidates_and_flags_all_suppressed_when_below_threshold() -> None:
+    scorer = _make_scorer()
+    candidates = [_make_candidate(drug_name="weak-a"), _make_candidate(drug_name="weak-b")]
+    spec = FakeSpec()
+
+    result = await scorer.score(candidates, spec, query_type="biosimilar_screen")
+    assert len(result) == 2
+    assert all(sc.suppressed for sc in result)
+    assert scorer.last_score_summary.total_candidates == 2
+    assert scorer.last_score_summary.returned_candidates == 2
+    assert scorer.last_score_summary.suppressed_candidates == 2
+
+
+async def test_score_no_suppression_for_unknown_query_type() -> None:
+    scorer = _make_scorer()
+    candidates = [_make_candidate(drug_name="a"), _make_candidate(drug_name="b")]
+    spec = FakeSpec()
+
+    result = await scorer.score(candidates, spec, query_type="unknown")
+    assert len(result) == 2
+    assert scorer.last_score_summary.threshold == 0.0
+
+
+async def test_score_empty_candidates_refreshes_summary_for_current_query_type() -> None:
+    scorer = _make_scorer()
+    non_empty = [_make_candidate(drug_name="matched", trials=[FakeTrial() for _ in range(10)])]
+    spec = FakeSpec(drug_names=["matched"])
+
+    first = await scorer.score(non_empty, spec, query_type="drug_lookup")
+    assert len(first) == 1
+    assert scorer.last_score_summary.query_type == "drug_lookup"
+    assert scorer.last_score_summary.total_candidates == 1
+
+    second = await scorer.score([], spec, query_type="biosimilar_screen")
+    assert second == []
+    assert scorer.last_score_summary.query_type == "biosimilar_screen"
+    assert scorer.last_score_summary.threshold == 0.45
+    assert scorer.last_score_summary.total_candidates == 0
+    assert scorer.last_score_summary.returned_candidates == 0
+    assert scorer.last_score_summary.suppressed_candidates == 0
 
 
 # ---------------------------------------------------------------------------
