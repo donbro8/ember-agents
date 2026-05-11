@@ -35,7 +35,9 @@ class FakeNarrowingProvider:
 
     options: list[tuple[str, str]] = field(default_factory=list)
 
-    async def get_options(self, dimension: str, spec: SearchSpec) -> list[tuple[str, str]]:
+    async def get_options(
+        self, dimension: str, spec: SearchSpec
+    ) -> list[tuple[str, str]]:
         return self.options
 
 
@@ -46,7 +48,8 @@ def _make_gate(
     return SearchGate(
         estimator=FakeEstimator(count=estimate),
         narrowing_provider=FakeNarrowingProvider(
-            options=narrowing_options or [("TA001", "Oncology"), ("TA002", "Immunology")]
+            options=narrowing_options
+            or [("TA001", "Oncology"), ("TA002", "Immunology")]
         ),
     )
 
@@ -73,7 +76,9 @@ def _resolved_term(
     confidence: float = 0.95,
 ) -> ResolvedTerm:
     """Build a ResolvedTerm using the real ember_data model (or fallback stub)."""
-    return ResolvedTerm(taxonomy=taxonomy, identifier=identifier, label=label, confidence=confidence)
+    return ResolvedTerm(
+        taxonomy=taxonomy, identifier=identifier, label=label, confidence=confidence
+    )
 
 
 def _pending_disambiguation(
@@ -92,6 +97,7 @@ def _pending_disambiguation(
             options=[option],
             rationale=rationale,
         )
+
     # Fallback: a simple truthy object with the expected attributes.
     @dataclass
     class _FallbackDisambiguation:
@@ -109,7 +115,10 @@ def _pending_disambiguation(
 async def test_gate_passes_with_target_set() -> None:
     """Gate should pass when target is populated and estimate is within limit."""
     gate = _make_gate(estimate=10)
-    spec = _spec(target=_resolved_term(taxonomy="target", identifier="P04626", label="HER2"), max_results=100)
+    spec = _spec(
+        target=_resolved_term(taxonomy="target", identifier="P04626", label="HER2"),
+        max_results=100,
+    )
     result = await gate.check(spec)
 
     assert result.passed is True
@@ -121,7 +130,12 @@ async def test_gate_passes_with_therapeutic_area_within_limit() -> None:
     """Gate should pass when therapeutic_area is set and estimate <= max_results."""
     gate = _make_gate(estimate=50)
     spec = _spec(
-        therapeutic_area=_resolved_term(taxonomy="indication_atc", identifier="L01XC", label="Antineoplastics", confidence=0.9),
+        therapeutic_area=_resolved_term(
+            taxonomy="indication_atc",
+            identifier="L01XC",
+            label="Antineoplastics",
+            confidence=0.9,
+        ),
         max_results=50,
     )
     result = await gate.check(spec)
@@ -133,7 +147,11 @@ async def test_gate_passes_with_indications_set() -> None:
     """Gate should pass when indications list is non-empty."""
     gate = _make_gate(estimate=5)
     spec = _spec(
-        indications=[_resolved_term(taxonomy="indication", identifier="D001943", label="Breast Neoplasms")],
+        indications=[
+            _resolved_term(
+                taxonomy="indication", identifier="D001943", label="Breast Neoplasms"
+            )
+        ],
         max_results=20,
     )
     result = await gate.check(spec)
@@ -153,7 +171,9 @@ async def test_gate_passes_with_drug_names_set() -> None:
 async def test_gate_honors_default_max_results() -> None:
     """Gate should pass when estimate is within the default max_results=500."""
     gate = _make_gate(estimate=499)
-    spec = _spec(target=_resolved_term(taxonomy="target", identifier="P04626", label="HER2"))
+    spec = _spec(
+        target=_resolved_term(taxonomy="target", identifier="P04626", label="HER2")
+    )
     result = await gate.check(spec)
 
     assert result.passed is True
@@ -162,7 +182,9 @@ async def test_gate_honors_default_max_results() -> None:
 async def test_gate_fails_too_broad_at_default_max_results() -> None:
     """Gate should fail too_broad when estimate exceeds the default max_results=500."""
     gate = _make_gate(estimate=99999)
-    spec = _spec(target=_resolved_term(taxonomy="target", identifier="P04626", label="HER2"))
+    spec = _spec(
+        target=_resolved_term(taxonomy="target", identifier="P04626", label="HER2")
+    )
     result = await gate.check(spec)
 
     assert result.passed is False
@@ -217,7 +239,11 @@ async def test_gate_blocked_by_pending_disambiguation() -> None:
     """Gate should fail when spec has unresolved disambiguation items."""
     gate = _make_gate()
     spec = _spec(
-        pending_disambiguations=[_pending_disambiguation(raw_input="BRAF", rationale="Which biological target did you mean?")],
+        pending_disambiguations=[
+            _pending_disambiguation(
+                raw_input="BRAF", rationale="Which biological target did you mean?"
+            )
+        ],
     )
     result = await gate.check(spec)
 
@@ -279,7 +305,12 @@ async def test_gate_fails_too_broad_returns_narrowing() -> None:
         ],
     )
     spec = _spec(
-        therapeutic_area=_resolved_term(taxonomy="indication_atc", identifier="L01XC", label="Antineoplastics", confidence=0.9),
+        therapeutic_area=_resolved_term(
+            taxonomy="indication_atc",
+            identifier="L01XC",
+            label="Antineoplastics",
+            confidence=0.9,
+        ),
         max_results=100,
     )
     result = await gate.check(spec)
@@ -295,8 +326,17 @@ async def test_gate_too_broad_broadest_dimension_is_therapeutic_area() -> None:
     """When both therapeutic_area and indications are set, therapeutic_area is broadest."""
     gate = _make_gate(estimate=200)
     spec = _spec(
-        therapeutic_area=_resolved_term(taxonomy="indication_atc", identifier="L01XC", label="Antineoplastics", confidence=0.9),
-        indications=[_resolved_term(taxonomy="indication", identifier="D001943", label="Breast Neoplasms")],
+        therapeutic_area=_resolved_term(
+            taxonomy="indication_atc",
+            identifier="L01XC",
+            label="Antineoplastics",
+            confidence=0.9,
+        ),
+        indications=[
+            _resolved_term(
+                taxonomy="indication", identifier="D001943", label="Breast Neoplasms"
+            )
+        ],
         max_results=50,
     )
     result = await gate.check(spec)
@@ -307,11 +347,17 @@ async def test_gate_too_broad_broadest_dimension_is_therapeutic_area() -> None:
     assert result.narrowing.dimension == "therapeutic_area"
 
 
-async def test_gate_too_broad_broadest_dimension_is_indications_without_therapeutic_area() -> None:
+async def test_gate_too_broad_broadest_dimension_is_indications_without_therapeutic_area() -> (
+    None
+):
     """When only indications is set (no therapeutic_area), indications is the broadest."""
     gate = _make_gate(estimate=300)
     spec = _spec(
-        indications=[_resolved_term(taxonomy="indication", identifier="D001943", label="Breast Neoplasms")],
+        indications=[
+            _resolved_term(
+                taxonomy="indication", identifier="D001943", label="Breast Neoplasms"
+            )
+        ],
         max_results=50,
     )
     result = await gate.check(spec)
@@ -337,7 +383,12 @@ async def test_narrowing_question_is_closed_option() -> None:
         ],
     )
     spec = _spec(
-        therapeutic_area=_resolved_term(taxonomy="indication_atc", identifier="L01XC", label="Antineoplastics", confidence=0.9),
+        therapeutic_area=_resolved_term(
+            taxonomy="indication_atc",
+            identifier="L01XC",
+            label="Antineoplastics",
+            confidence=0.9,
+        ),
         max_results=10,
     )
     result = await gate.check(spec)
@@ -364,7 +415,12 @@ async def test_narrowing_question_mentions_dimension() -> None:
         narrowing_options=[("P04626", "HER2")],
     )
     spec = _spec(
-        therapeutic_area=_resolved_term(taxonomy="indication_atc", identifier="L01XC", label="Antineoplastics", confidence=0.9),
+        therapeutic_area=_resolved_term(
+            taxonomy="indication_atc",
+            identifier="L01XC",
+            label="Antineoplastics",
+            confidence=0.9,
+        ),
         max_results=50,
     )
     result = await gate.check(spec)

@@ -45,7 +45,12 @@ ALWAYS_REQUIRED = [
     "source_urls",
 ]
 REQUIRED_FOR_DRUG = ["drug_name"]
-OPTIONAL_ENRICHMENT = ["indication", "mechanism_of_action", "clinical_stage", "synthesis_summary"]
+OPTIONAL_ENRICHMENT = [
+    "indication",
+    "mechanism_of_action",
+    "clinical_stage",
+    "synthesis_summary",
+]
 PATENT_FIELDS = [
     "country_code",
     "country_name",

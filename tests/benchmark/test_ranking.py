@@ -22,7 +22,10 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ember_agents.agent import EmberAgent
-from ember_agents.search.classify import ClassificationOrchestrator, ClassificationResult
+from ember_agents.search.classify import (
+    ClassificationOrchestrator,
+    ClassificationResult,
+)
 from ember_agents.search.fetch import FetchOrchestrator
 from ember_agents.search.gate import GateResult, SearchGate
 from ember_agents.search.interpret import IntentExtractor, RawSignals
@@ -360,12 +363,13 @@ def _make_benchmark_agent(query: str, query_type: str = "drug_lookup") -> EmberA
     )
 
 
-def _find_drug_rank(
-    scored: list[ScoredCandidate], drug_name: str
-) -> int | None:
+def _find_drug_rank(scored: list[ScoredCandidate], drug_name: str) -> int | None:
     """Return the 1-based rank of *drug_name* in *scored*, or None if absent."""
     for sc in scored:
-        if sc.candidate.drug_name is not None and sc.candidate.drug_name.lower() == drug_name.lower():
+        if (
+            sc.candidate.drug_name is not None
+            and sc.candidate.drug_name.lower() == drug_name.lower()
+        ):
             return sc.rank
     return None
 

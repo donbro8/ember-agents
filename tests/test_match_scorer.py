@@ -116,7 +116,9 @@ class FakeSpec:
     resolved_terms: list = field(default_factory=list)
     pending_disambiguations: list = field(default_factory=list)
     max_results: int = 500
-    domains: list = field(default_factory=lambda: ["trials", "patents", "articles", "candidates"])
+    domains: list = field(
+        default_factory=lambda: ["trials", "patents", "articles", "candidates"]
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -622,7 +624,9 @@ async def test_end_to_end_scoring_three_candidates() -> None:
         indications=[FakeIndication(label="breast cancer")],
     )
 
-    result = await scorer.score([cand_c, cand_b, cand_a], spec, query_text="HER2 breast cancer")
+    result = await scorer.score(
+        [cand_c, cand_b, cand_a], spec, query_text="HER2 breast cancer"
+    )
 
     # All 3 candidates should be scored and ranked
     assert len(result) == 3
@@ -641,7 +645,9 @@ async def test_end_to_end_scoring_three_candidates() -> None:
 
     # Candidate A (trastuzumab with best match + evidence) should rank first
     rank_1 = next(sc for sc in result if sc.rank == 1)
-    assert rank_1.candidate is cand_a or rank_1.overall_score >= result[-1].overall_score
+    assert (
+        rank_1.candidate is cand_a or rank_1.overall_score >= result[-1].overall_score
+    )
 
 
 async def test_end_to_end_scoring_with_query_text() -> None:
@@ -775,9 +781,14 @@ async def test_score_suppresses_low_confidence_by_query_type() -> None:
     assert scorer.last_score_summary.threshold > 0.0
 
 
-async def test_score_returns_all_candidates_and_flags_all_suppressed_when_below_threshold() -> None:
+async def test_score_returns_all_candidates_and_flags_all_suppressed_when_below_threshold() -> (
+    None
+):
     scorer = _make_scorer()
-    candidates = [_make_candidate(drug_name="weak-a"), _make_candidate(drug_name="weak-b")]
+    candidates = [
+        _make_candidate(drug_name="weak-a"),
+        _make_candidate(drug_name="weak-b"),
+    ]
     spec = FakeSpec()
 
     result = await scorer.score(candidates, spec, query_type="biosimilar_screen")
@@ -798,9 +809,13 @@ async def test_score_no_suppression_for_unknown_query_type() -> None:
     assert scorer.last_score_summary.threshold == 0.0
 
 
-async def test_score_empty_candidates_refreshes_summary_for_current_query_type() -> None:
+async def test_score_empty_candidates_refreshes_summary_for_current_query_type() -> (
+    None
+):
     scorer = _make_scorer()
-    non_empty = [_make_candidate(drug_name="matched", trials=[FakeTrial() for _ in range(10)])]
+    non_empty = [
+        _make_candidate(drug_name="matched", trials=[FakeTrial() for _ in range(10)])
+    ]
     spec = FakeSpec(drug_names=["matched"])
 
     first = await scorer.score(non_empty, spec, query_type="drug_lookup")
@@ -893,13 +908,17 @@ def test_query_type_weights_general() -> None:
     assert w_sem == 0.4
 
 
-def test_compute_overall_uses_query_type_weights_when_chroma_available(monkeypatch: Any) -> None:
+def test_compute_overall_uses_query_type_weights_when_chroma_available(
+    monkeypatch: Any,
+) -> None:
     """_compute_overall should use provided weights when ChromaDB is available."""
     monkeypatch.setattr("ember_agents.search.match._CHROMA_AVAILABLE", True)
 
     # biosimilar_screen: structured=0.5, evidence=0.3, semantic=0.2
     w_s, w_e, w_sem = _QUERY_TYPE_WEIGHTS["biosimilar_screen"]
-    result = _compute_overall(0.6, 0.8, 0.4, w_structured=w_s, w_evidence=w_e, w_semantic=w_sem)
+    result = _compute_overall(
+        0.6, 0.8, 0.4, w_structured=w_s, w_evidence=w_e, w_semantic=w_sem
+    )
     expected = 0.2 * 0.6 + 0.5 * 0.8 + 0.3 * 0.4
     assert abs(result - expected) < 1e-9
 
@@ -908,7 +927,9 @@ def test_compute_overall_drug_lookup_weights(monkeypatch: Any) -> None:
     """drug_lookup shifts weight toward evidence (0.5)."""
     monkeypatch.setattr("ember_agents.search.match._CHROMA_AVAILABLE", True)
     w_s, w_e, w_sem = _QUERY_TYPE_WEIGHTS["drug_lookup"]
-    result = _compute_overall(0.6, 0.8, 0.4, w_structured=w_s, w_evidence=w_e, w_semantic=w_sem)
+    result = _compute_overall(
+        0.6, 0.8, 0.4, w_structured=w_s, w_evidence=w_e, w_semantic=w_sem
+    )
     expected = 0.2 * 0.6 + 0.3 * 0.8 + 0.5 * 0.4
     assert abs(result - expected) < 1e-9
 
@@ -919,12 +940,16 @@ def test_compute_overall_no_chroma_rebalance_preserved_with_query_type_weights(
     """When ChromaDB is unavailable, 0.65/0.35 rebalance is preserved regardless of weights."""
     monkeypatch.setattr("ember_agents.search.match._CHROMA_AVAILABLE", False)
     w_s, w_e, w_sem = _QUERY_TYPE_WEIGHTS["biosimilar_screen"]
-    result = _compute_overall(0.0, 0.5, 0.3, w_structured=w_s, w_evidence=w_e, w_semantic=w_sem)
+    result = _compute_overall(
+        0.0, 0.5, 0.3, w_structured=w_s, w_evidence=w_e, w_semantic=w_sem
+    )
     expected = 0.65 * 0.5 + 0.35 * 0.3
     assert abs(result - expected) < 1e-9
 
 
-async def test_score_query_type_biosimilar_screen_shifts_weights(monkeypatch: Any) -> None:
+async def test_score_query_type_biosimilar_screen_shifts_weights(
+    monkeypatch: Any,
+) -> None:
     """biosimilar_screen query_type should increase structured weight to 0.5."""
     monkeypatch.setattr("ember_agents.search.match._CHROMA_AVAILABLE", True)
 
@@ -970,7 +995,9 @@ async def test_score_query_type_drug_lookup_shifts_weights(monkeypatch: Any) -> 
     assert 0.0 <= result[0].overall_score <= 1.0
 
 
-async def test_score_query_type_unknown_falls_back_to_defaults(monkeypatch: Any) -> None:
+async def test_score_query_type_unknown_falls_back_to_defaults(
+    monkeypatch: Any,
+) -> None:
     """An unrecognised query_type should fall back to default weights."""
     monkeypatch.setattr("ember_agents.search.match._CHROMA_AVAILABLE", True)
 
@@ -997,7 +1024,10 @@ async def test_score_query_type_none_uses_default_weights() -> None:
 
     assert len(result_implicit) == 1
     assert len(result_explicit_none) == 1
-    assert abs(result_implicit[0].overall_score - result_explicit_none[0].overall_score) < 1e-9
+    assert (
+        abs(result_implicit[0].overall_score - result_explicit_none[0].overall_score)
+        < 1e-9
+    )
 
 
 async def test_score_query_type_opportunity_scan() -> None:

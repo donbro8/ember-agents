@@ -219,9 +219,7 @@ class TestFetchByName:
         assert results[0].drug_name == "AlphaMab"
 
     @pytest.mark.asyncio
-    async def test_match_by_brand_names_field(
-        self, source: BiologicSeedSource
-    ) -> None:
+    async def test_match_by_brand_names_field(self, source: BiologicSeedSource) -> None:
         spec = _make_spec(brand_names=["BetaBrand"])
         results = await source.fetch(spec, query_type="name_lookup")
         assert len(results) == 1
@@ -298,17 +296,13 @@ class TestFetchResultStructure:
         assert "AlphaTrade" in results[0].synonyms
 
     @pytest.mark.asyncio
-    async def test_matched_dimensions_tagged(
-        self, source: BiologicSeedSource
-    ) -> None:
+    async def test_matched_dimensions_tagged(self, source: BiologicSeedSource) -> None:
         spec = _make_spec(drug_names=["AlphaMab"])
         results = await source.fetch(spec, query_type="name_lookup")
         assert "biologic_seed" in results[0].matched_dimensions
 
     @pytest.mark.asyncio
-    async def test_patents_populated_as_list(
-        self, source: BiologicSeedSource
-    ) -> None:
+    async def test_patents_populated_as_list(self, source: BiologicSeedSource) -> None:
         spec = _make_spec(drug_names=["AlphaMab"])
         results = await source.fetch(spec, query_type="name_lookup")
         # AlphaMab has US and EU patent_expiries so there must be at least one entry
@@ -316,9 +310,7 @@ class TestFetchResultStructure:
         assert len(results[0].patents) >= 1
 
     @pytest.mark.asyncio
-    async def test_patent_jurisdiction_fields(
-        self, source: BiologicSeedSource
-    ) -> None:
+    async def test_patent_jurisdiction_fields(self, source: BiologicSeedSource) -> None:
         """PatentJurisdiction objects must carry country_code, status, and url."""
         spec = _make_spec(drug_names=["AlphaMab"])
         results = await source.fetch(spec, query_type="name_lookup")
@@ -368,9 +360,7 @@ class TestBiosimilarScreenFilter:
         assert len(results) >= 2
 
     @pytest.mark.asyncio
-    async def test_custom_revenue_threshold(
-        self, source: BiologicSeedSource
-    ) -> None:
+    async def test_custom_revenue_threshold(self, source: BiologicSeedSource) -> None:
         spec = _make_spec(min_revenue_millions=1000.0)
         results = await source.fetch(spec, query_type="biosimilar_screen")
         names = {r.drug_name for r in results}
@@ -420,7 +410,9 @@ class TestBiosimilarScreenFilter:
             assert len(r.patents) >= 1
 
     @pytest.mark.asyncio
-    async def test_filters_modality_category_and_cell_line(self, source: BiologicSeedSource) -> None:
+    async def test_filters_modality_category_and_cell_line(
+        self, source: BiologicSeedSource
+    ) -> None:
         expiry_window = SimpleNamespace(start=date(2025, 1, 1), end=date(2028, 12, 31))
         spec = _make_spec(
             min_revenue_millions=1.0,

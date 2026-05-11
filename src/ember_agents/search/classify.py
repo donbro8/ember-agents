@@ -124,6 +124,7 @@ class _CandidateAdapter:
 @dataclass
 class _ListAsResult:
     """Wraps a plain list as a ResolverResult-compatible object."""
+
     candidates: list
 
 
@@ -286,7 +287,9 @@ class ClassificationOrchestrator:
                 continue
             if _needs_disambiguation(candidates):
                 options_rt = [_to_resolved_term("target", c) for c in candidates]
-                question = _build_question("Which biological target did you mean?", candidates)
+                question = _build_question(
+                    "Which biological target did you mean?", candidates
+                )
                 disambiguations.append(
                     DisambiguationRequest(
                         dimension="target",
@@ -344,8 +347,12 @@ class ClassificationOrchestrator:
             if not candidates:
                 continue
             if _needs_disambiguation(candidates):
-                options_rt = [_to_resolved_term("indication_atc", c) for c in candidates]
-                question = _build_question("Which ATC classification did you mean?", candidates)
+                options_rt = [
+                    _to_resolved_term("indication_atc", c) for c in candidates
+                ]
+                question = _build_question(
+                    "Which ATC classification did you mean?", candidates
+                )
                 disambiguations.append(
                     DisambiguationRequest(
                         dimension="indication_atc",
@@ -374,7 +381,9 @@ class ClassificationOrchestrator:
                 continue
             if _needs_disambiguation(candidates):
                 options_rt = [_to_resolved_term("modality", c) for c in candidates]
-                question = _build_question("Which drug modality did you mean?", candidates)
+                question = _build_question(
+                    "Which drug modality did you mean?", candidates
+                )
                 disambiguations.append(
                     DisambiguationRequest(
                         dimension="modality",
@@ -416,8 +425,16 @@ class ClassificationOrchestrator:
         return ClassificationResult(spec=spec, disambiguations=disambiguations)
 
 
-_REVENUE_PATTERN = re.compile(r"(\d+(?:\.\d+)?)\s*([bm]|billion|million)?", re.IGNORECASE)
-_HIGH_VALUE_MARKERS = ("high-value", "high value", "blockbuster", "top-selling", "top selling")
+_REVENUE_PATTERN = re.compile(
+    r"(\d+(?:\.\d+)?)\s*([bm]|billion|million)?", re.IGNORECASE
+)
+_HIGH_VALUE_MARKERS = (
+    "high-value",
+    "high value",
+    "blockbuster",
+    "top-selling",
+    "top selling",
+)
 _JURISDICTION_MAP: dict[str, str] = {
     "us": "US",
     "u.s.": "US",
@@ -459,7 +476,11 @@ def _extract_min_revenue_millions(commercial_signals: list[str]) -> float | None
             best = value
     if best is not None:
         return best
-    if any(marker in s.lower() for s in commercial_signals for marker in _HIGH_VALUE_MARKERS):
+    if any(
+        marker in s.lower()
+        for s in commercial_signals
+        for marker in _HIGH_VALUE_MARKERS
+    ):
         return 1000.0
     return None
 

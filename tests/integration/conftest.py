@@ -20,7 +20,10 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ember_agents.agent import EmberAgent
-from ember_agents.search.classify import ClassificationOrchestrator, ClassificationResult
+from ember_agents.search.classify import (
+    ClassificationOrchestrator,
+    ClassificationResult,
+)
 from ember_agents.search.fetch import FetchOrchestrator
 from ember_agents.search.gate import GateResult, SearchGate
 from ember_agents.search.interpret import IntentExtractor, RawSignals
@@ -196,7 +199,9 @@ def _build_results() -> None:
         ),
     ]
 
-    QUERY_RESULTS["biosimilar opportunities for biologics with revenue over 1 billion"] = [
+    QUERY_RESULTS[
+        "biosimilar opportunities for biologics with revenue over 1 billion"
+    ] = [
         _make_drug_result(
             "trastuzumab",
             score=0.93,

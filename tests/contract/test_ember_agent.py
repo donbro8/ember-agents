@@ -19,7 +19,10 @@ from unittest.mock import AsyncMock, MagicMock
 from ember_agents.agent import EmberAgent
 from ember_agents.base import Agent
 from ember_agents.render import ResultRenderer
-from ember_agents.search.classify import ClassificationOrchestrator, ClassificationResult
+from ember_agents.search.classify import (
+    ClassificationOrchestrator,
+    ClassificationResult,
+)
 from ember_agents.search.fetch import FetchOrchestrator, FetchResult
 from ember_agents.search.gate import GateResult, SearchGate
 from ember_agents.search.interpret import IntentExtractor, RawSignals
@@ -306,4 +309,3 @@ class TestEmberAgentBiosimilarScreen:
         async for _ in agent.run("biosimilar screen"):
             pass
         agent._scorer.score.assert_not_called()
-

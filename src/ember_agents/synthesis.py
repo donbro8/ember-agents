@@ -190,7 +190,9 @@ class ResultSynthesizer:
             ]
             response = await self._llm.ainvoke(messages)
 
-            raw_text = response.content if hasattr(response, "content") else str(response)
+            raw_text = (
+                response.content if hasattr(response, "content") else str(response)
+            )
             # Strip markdown fences if present
             cleaned = raw_text.strip()
             if cleaned.startswith("```"):
@@ -269,13 +271,13 @@ class ChangeSummarizer:
                 ("human", user_content),
             ]
             response = await self._llm.ainvoke(messages)
-            raw_text = response.content if hasattr(response, "content") else str(response)
+            raw_text = (
+                response.content if hasattr(response, "content") else str(response)
+            )
             return raw_text.strip()
         except Exception:  # noqa: BLE001
             # Graceful degradation: plaintext fallback
-            parts = [
-                f"{c.change_type}: {c.display_label}" for c in changes
-            ]
+            parts = [f"{c.change_type}: {c.display_label}" for c in changes]
             return "Changes detected: " + ", ".join(parts)
 
 
@@ -369,18 +371,15 @@ class DigestGenerator:
                     section += f"Summary: {w.change_summary}\n"
                 top_results = w.latest_results[:_MAX_CHANGE_CONTEXT_RESULTS]
                 if top_results:
-                    result_blocks = [
-                        _build_candidate_block(r) for r in top_results
-                    ]
+                    result_blocks = [_build_candidate_block(r) for r in top_results]
                     section += (
                         f"Top results:\n"
                         f"{json.dumps(result_blocks, indent=2, default=str)}\n"
                     )
                 watch_sections.append(section)
 
-            user_content = (
-                f"Period: {period_start} to {period_end}\n\n"
-                + "\n".join(watch_sections)
+            user_content = f"Period: {period_start} to {period_end}\n\n" + "\n".join(
+                watch_sections
             )
 
             messages = [
@@ -390,9 +389,7 @@ class DigestGenerator:
             response = await self._llm.ainvoke(messages)
 
             raw_text = (
-                response.content
-                if hasattr(response, "content")
-                else str(response)
+                response.content if hasattr(response, "content") else str(response)
             )
             cleaned = raw_text.strip()
             if cleaned.startswith("```"):

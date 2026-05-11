@@ -187,7 +187,9 @@ def _candidate_to_result(
     # Risk flags
     risk_flags: list[str] = [str(f) for f in (getattr(cand, "risk_flags", []) or [])]
 
-    overall_score: float | None = scored.overall_score if scored.overall_score > 0 else None
+    overall_score: float | None = (
+        scored.overall_score if scored.overall_score > 0 else None
+    )
 
     # Score breakdown
     structured_score: float | None = getattr(scored, "structured_score", None)
@@ -204,7 +206,9 @@ def _candidate_to_result(
                         nct_id=getattr(t, "nct_id", "") or "",
                         phase=str(getattr(t, "phase", "") or ""),
                         status=str(getattr(t, "status", "") or ""),
-                        indication=(getattr(t, "conditions", None) or [None])[0] if getattr(t, "conditions", None) else None,
+                        indication=(getattr(t, "conditions", None) or [None])[0]
+                        if getattr(t, "conditions", None)
+                        else None,
                         sponsor=getattr(t, "sponsor", None),
                         url=None,
                     )
@@ -240,16 +244,24 @@ def _candidate_to_result(
     target_aliases: list[str] = list(getattr(cand, "target_aliases", []) or [])
 
     # Commercial fields
-    annual_revenue_usd_millions: float | None = getattr(cand, "annual_revenue_usd_millions", None)
+    annual_revenue_usd_millions: float | None = getattr(
+        cand, "annual_revenue_usd_millions", None
+    )
     revenue_year: int | None = getattr(cand, "revenue_year", None)
-    biosimilar_competitors: list[str] = list(getattr(cand, "biosimilar_competitors", []) or [])
-    has_approved_biosimilar: bool = getattr(cand, "has_approved_biosimilar", False) or False
+    biosimilar_competitors: list[str] = list(
+        getattr(cand, "biosimilar_competitors", []) or []
+    )
+    has_approved_biosimilar: bool = (
+        getattr(cand, "has_approved_biosimilar", False) or False
+    )
 
     # FDA fields
     fda_generic_name: str | None = getattr(cand, "fda_generic_name", None) or None
     fda_brand_name: str | None = getattr(cand, "fda_brand_name", None) or None
     fda_manufacturer: str | None = getattr(cand, "fda_manufacturer", None) or None
-    fda_therapeutic_area: str | None = getattr(cand, "fda_therapeutic_area", None) or None
+    fda_therapeutic_area: str | None = (
+        getattr(cand, "fda_therapeutic_area", None) or None
+    )
 
     # Indications
     indication: list[str] = list(getattr(cand, "indications", []) or [])
@@ -269,7 +281,9 @@ def _candidate_to_result(
             best_phase_order = phase_num
             latest_trial_phase = phase_str
 
-    matched_dimensions: list[str] = [str(d) for d in (getattr(cand, "matched_dimensions", []) or [])]
+    matched_dimensions: list[str] = [
+        str(d) for d in (getattr(cand, "matched_dimensions", []) or [])
+    ]
     matched_set = {d.lower() for d in matched_dimensions}
     expected_dims = [d for d in (expected_dimensions or []) if d]
     missed_dimensions = [d for d in expected_dims if d.lower() not in matched_set]
@@ -488,7 +502,9 @@ def _gate_blocked_diagnostics(gate_reason: str, signals: RawSignals, spec: Any) 
         if hints:
             lines.append("> Missing inputs: " + "; ".join(hints[:4]) + ".")
     elif gate_reason == "pending_disambiguations":
-        lines.append("> Missing input: choose one of the disambiguation options and retry.")
+        lines.append(
+            "> Missing input: choose one of the disambiguation options and retry."
+        )
 
     return "\n".join(lines) + "\n"
 
@@ -601,7 +617,9 @@ class EmberAgent(Agent):
             yield f"> **Error** during gate check: {exc}\n"
             return
 
-        gate_outcome = "passed" if gate_result.passed else (gate_result.reason or "failed")
+        gate_outcome = (
+            "passed" if gate_result.passed else (gate_result.reason or "failed")
+        )
 
         if not gate_result.passed:
             if gate_result.narrowing:
@@ -632,7 +650,9 @@ class EmberAgent(Agent):
             candidates: list[Any] = await self._fetcher.fetch(spec)
             orch_count = len(candidates)
             source_statuses.append(
-                SourceStatus(name="fetch_orchestrator", status="ok", result_count=orch_count)
+                SourceStatus(
+                    name="fetch_orchestrator", status="ok", result_count=orch_count
+                )
             )
             source_statuses.extend(_fetcher_source_statuses(self._fetcher))
         except Exception as exc:  # noqa: BLE001
@@ -644,16 +664,24 @@ class EmberAgent(Agent):
 
         # BiologicSeedSource fetch (always runs alongside FetchOrchestrator)
         try:
-            seed_results = await self._seed_source.fetch(spec, query_type=signals.query_type)
+            seed_results = await self._seed_source.fetch(
+                spec, query_type=signals.query_type
+            )
             seed_count = len(seed_results)
             source_statuses.append(
-                SourceStatus(name="biologic_seed", status="ok" if seed_count else "empty", result_count=seed_count)
+                SourceStatus(
+                    name="biologic_seed",
+                    status="ok" if seed_count else "empty",
+                    result_count=seed_count,
+                )
             )
             # Merge seed results by converting FetchResult → Candidate stubs
             # The seed FetchResults carry patent data; wrap them to look like
             # Candidates so the MatchScorer can score them.
             if seed_results:
-                candidates = candidates + [_fetch_result_to_candidate_stub(r) for r in seed_results]
+                candidates = candidates + [
+                    _fetch_result_to_candidate_stub(r) for r in seed_results
+                ]
         except Exception as exc:  # noqa: BLE001
             yield f"> **Warning** — biologic seed source error: {exc}\n"
             source_statuses.append(
@@ -767,7 +795,9 @@ class EmberAgent(Agent):
                 source_statuses=[],
                 duration_seconds=duration,
             )
-            markdown = f"# Ember Search: {query}\n\n> **Error** during classification: {exc}\n"
+            markdown = (
+                f"# Ember Search: {query}\n\n> **Error** during classification: {exc}\n"
+            )
             return PipelineOutput(
                 markdown=markdown,
                 results=[],
@@ -793,7 +823,9 @@ class EmberAgent(Agent):
                 source_statuses=[],
                 duration_seconds=duration,
             )
-            markdown = f"# Ember Search: {query}\n\n> **Error** during gate check: {exc}\n"
+            markdown = (
+                f"# Ember Search: {query}\n\n> **Error** during gate check: {exc}\n"
+            )
             return PipelineOutput(
                 markdown=markdown,
                 results=[],
@@ -802,7 +834,9 @@ class EmberAgent(Agent):
                 run_id=run_id,
             )
 
-        gate_outcome = "passed" if gate_result.passed else (gate_result.reason or "failed")
+        gate_outcome = (
+            "passed" if gate_result.passed else (gate_result.reason or "failed")
+        )
 
         if not gate_result.passed:
             duration = time.monotonic() - start_time
@@ -837,7 +871,9 @@ class EmberAgent(Agent):
         try:
             candidates: list[Any] = await self._fetcher.fetch(spec)
             source_statuses.append(
-                SourceStatus(name="fetch_orchestrator", status="ok", result_count=len(candidates))
+                SourceStatus(
+                    name="fetch_orchestrator", status="ok", result_count=len(candidates)
+                )
             )
             source_statuses.extend(_fetcher_source_statuses(self._fetcher))
         except Exception:  # noqa: BLE001
@@ -847,13 +883,21 @@ class EmberAgent(Agent):
             )
 
         try:
-            seed_results = await self._seed_source.fetch(spec, query_type=signals.query_type)
+            seed_results = await self._seed_source.fetch(
+                spec, query_type=signals.query_type
+            )
             seed_count = len(seed_results)
             source_statuses.append(
-                SourceStatus(name="biologic_seed", status="ok" if seed_count else "empty", result_count=seed_count)
+                SourceStatus(
+                    name="biologic_seed",
+                    status="ok" if seed_count else "empty",
+                    result_count=seed_count,
+                )
             )
             if seed_results:
-                candidates = candidates + [_fetch_result_to_candidate_stub(r) for r in seed_results]
+                candidates = candidates + [
+                    _fetch_result_to_candidate_stub(r) for r in seed_results
+                ]
         except Exception:  # noqa: BLE001
             source_statuses.append(
                 SourceStatus(name="biologic_seed", status="error", result_count=0)
@@ -872,7 +916,9 @@ class EmberAgent(Agent):
         except Exception:  # noqa: BLE001
             scored_candidates = []
 
-        candidate_results: list[Any] = [_candidate_to_result(sc) for sc in scored_candidates]
+        candidate_results: list[Any] = [
+            _candidate_to_result(sc) for sc in scored_candidates
+        ]
 
         # ----------------------------------------------------------------
         # Phase 5.5: Synthesize (optional)
@@ -881,7 +927,10 @@ class EmberAgent(Agent):
         if self._synthesizer is not None:
             try:
                 synthesis_output = await self._synthesizer.synthesize(
-                    query, signals.query_type, candidate_results, None,
+                    query,
+                    signals.query_type,
+                    candidate_results,
+                    None,
                 )
                 synthesis_overview = synthesis_output.overview
                 for cr in candidate_results:
@@ -904,7 +953,9 @@ class EmberAgent(Agent):
             duration_seconds=duration,
         )
 
-        markdown = self._renderer.render(trace, candidate_results, synthesis_overview=synthesis_overview)
+        markdown = self._renderer.render(
+            trace, candidate_results, synthesis_overview=synthesis_overview
+        )
 
         return PipelineOutput(
             markdown=markdown,
@@ -974,15 +1025,21 @@ def _fetch_result_to_candidate_stub(fetch_result: Any) -> Any:
         modality=getattr(fetch_result, "modality", None) or None,
         category=getattr(fetch_result, "category", None) or None,
         target_aliases=list(getattr(fetch_result, "target_aliases", []) or []),
-        annual_revenue_usd_millions=getattr(fetch_result, "annual_revenue_usd_millions", None),
+        annual_revenue_usd_millions=getattr(
+            fetch_result, "annual_revenue_usd_millions", None
+        ),
         revenue_year=getattr(fetch_result, "revenue_year", None),
-        biosimilar_competitors=list(getattr(fetch_result, "biosimilar_competitors", []) or []),
-        has_approved_biosimilar=getattr(fetch_result, "has_approved_biosimilar", False) or False,
+        biosimilar_competitors=list(
+            getattr(fetch_result, "biosimilar_competitors", []) or []
+        ),
+        has_approved_biosimilar=getattr(fetch_result, "has_approved_biosimilar", False)
+        or False,
         indications=list(getattr(fetch_result, "indications", []) or []),
         fda_generic_name=getattr(fetch_result, "fda_generic_name", None) or None,
         fda_brand_name=getattr(fetch_result, "fda_brand_name", None) or None,
         fda_manufacturer=getattr(fetch_result, "fda_manufacturer", None) or None,
-        fda_therapeutic_area=getattr(fetch_result, "fda_therapeutic_area", None) or None,
+        fda_therapeutic_area=getattr(fetch_result, "fda_therapeutic_area", None)
+        or None,
     )
 
 
@@ -1001,6 +1058,12 @@ def _fetcher_source_statuses(fetcher: Any) -> list[SourceStatus]:
         name = item.get("name")
         status = item.get("status")
         result_count = item.get("result_count")
-        if isinstance(name, str) and isinstance(status, str) and isinstance(result_count, int):
-            statuses.append(SourceStatus(name=name, status=status, result_count=result_count))
+        if (
+            isinstance(name, str)
+            and isinstance(status, str)
+            and isinstance(result_count, int)
+        ):
+            statuses.append(
+                SourceStatus(name=name, status=status, result_count=result_count)
+            )
     return statuses

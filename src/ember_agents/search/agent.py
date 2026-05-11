@@ -15,11 +15,18 @@ from collections.abc import AsyncGenerator
 from typing import Any
 
 from ember_agents.base import Agent
-from ember_agents.search.classify import ClassificationOrchestrator, DisambiguationRequest
+from ember_agents.search.classify import (
+    ClassificationOrchestrator,
+    DisambiguationRequest,
+)
 from ember_agents.search.fetch import FetchOrchestrator
 from ember_agents.search.gate import GateResult, NarrowingRequest, SearchGate
 from ember_agents.search.interpret import IntentExtractor, RawSignals
-from ember_agents.search.match import MatchScorer, ScoredCandidate, semantic_scoring_available
+from ember_agents.search.match import (
+    MatchScorer,
+    ScoredCandidate,
+    semantic_scoring_available,
+)
 from ember_agents.search.urls import patent_url, pubmed_url, trial_url, uniprot_url
 
 # Maximum number of disambiguation/narrowing loops before giving up.
@@ -328,7 +335,9 @@ class SearchAgent(Agent):
         # ----------------------------------------------------------------
         yield f"_Found **{len(scored_candidates)}** candidates matching your query. Results are ranked by how closely each candidate matches your search criteria (target, indication, modality) and the depth of supporting evidence (trials, patents, articles)._\n\n"
 
-        async for fragment in self._render_results(scored_candidates, query, signals=signals):
+        async for fragment in self._render_results(
+            scored_candidates, query, signals=signals
+        ):
             yield fragment
 
     # ------------------------------------------------------------------
@@ -426,7 +435,9 @@ class SearchAgent(Agent):
         if n_patents:
             evidence_parts.append(f"{n_patents} patent{'s' if n_patents != 1 else ''}")
         if n_articles:
-            evidence_parts.append(f"{n_articles} article{'s' if n_articles != 1 else ''}")
+            evidence_parts.append(
+                f"{n_articles} article{'s' if n_articles != 1 else ''}"
+            )
 
         # Build the one-liner
         detail_parts: list[str] = dim_parts
@@ -506,7 +517,7 @@ class SearchAgent(Agent):
         lines: list[str] = []
         lines.append(
             f"A total of **{n_candidates}** candidate(s) were identified for the "
-            f"query *\"{query}\"*. "
+            f'query *"{query}"*. '
         )
 
         lines.append(

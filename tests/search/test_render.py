@@ -94,7 +94,11 @@ def _make_scored(
     sources: list[_StubProv] | None = None,
     target_uniprot: str | None = None,
 ) -> ScoredCandidate:
-    target = _StubTarget(label=target_label or "", uniprot_id=target_uniprot) if target_label else None
+    target = (
+        _StubTarget(label=target_label or "", uniprot_id=target_uniprot)
+        if target_label
+        else None
+    )
     cand = _StubCandidate(
         id=f"cand-{rank}",
         drug_name=drug_name,
@@ -124,7 +128,9 @@ async def _collect_candidate(agent: SearchAgent, sc: ScoredCandidate) -> str:
     return "".join(parts)
 
 
-async def _collect_results(agent: SearchAgent, scored: list[ScoredCandidate], query: str = "test") -> str:
+async def _collect_results(
+    agent: SearchAgent, scored: list[ScoredCandidate], query: str = "test"
+) -> str:
     parts: list[str] = []
     async for fragment in agent._render_results(scored, query):
         parts.append(fragment)
@@ -195,7 +201,12 @@ class TestRenderCandidate:
         assert "**Match: Weak**" in output
 
     async def test_matched_dimensions_with_checkmark(self, agent: SearchAgent):
-        sc = _make_scored(overall=0.5, drug_name="X", target_label="EGFR", dims=["target", "indication"])
+        sc = _make_scored(
+            overall=0.5,
+            drug_name="X",
+            target_label="EGFR",
+            dims=["target", "indication"],
+        )
         output = await _collect_candidate(agent, sc)
         # Should show actual target value from candidate, not dimension name
         assert "Target: EGFR \u2713" in output
@@ -205,8 +216,11 @@ class TestRenderCandidate:
     async def test_matched_dimensions_with_signals(self, agent: SearchAgent):
         """When signals are provided, dimension values come from query signals."""
         from ember_agents.search.interpret import RawSignals
+
         sc = _make_scored(overall=0.5, drug_name="X", dims=["target", "indication"])
-        signals = RawSignals(target=["EGFR"], indication=["oncology"], modality=[], commercial=[])
+        signals = RawSignals(
+            target=["EGFR"], indication=["oncology"], modality=[], commercial=[]
+        )
         parts: list[str] = []
         async for fragment in agent._render_candidate(sc, signals=signals):
             parts.append(fragment)
@@ -243,7 +257,9 @@ class TestRenderCandidate:
 
     async def test_source_links_rendered(self, agent: SearchAgent):
         """Source links with URLs should use markdown link syntax."""
-        sources = [_StubProv(source_name="UniProt", source_url="https://uniprot.org/123")]
+        sources = [
+            _StubProv(source_name="UniProt", source_url="https://uniprot.org/123")
+        ]
         sc = _make_scored(overall=0.5, drug_name="X", sources=sources)
         # Note: the new code uses verified source links from trials/articles/target,
         # not from contributing_sources. contributing_sources are used in the
@@ -254,7 +270,12 @@ class TestRenderCandidate:
 
     async def test_verified_source_links(self, agent: SearchAgent):
         """Candidates with trial NCT IDs should show ClinicalTrials.gov link."""
-        sc = _make_scored(overall=0.5, drug_name="Erlotinib", target_label="EGFR", target_uniprot="P00533")
+        sc = _make_scored(
+            overall=0.5,
+            drug_name="Erlotinib",
+            target_label="EGFR",
+            target_uniprot="P00533",
+        )
         # Add a trial with NCT ID
         sc.candidate.trials = [_StubTrial(nct_id="NCT01234567")]
         sc.candidate.articles = [_StubArticle(pmid="12345678")]
@@ -285,7 +306,10 @@ class TestRenderResultsCap:
         assert "additional candidate" not in output
 
     async def test_caps_at_10_candidates(self, agent: SearchAgent):
-        scored = [_make_scored(rank=i, overall=1.0 - i * 0.01, drug_name=f"Drug{i}") for i in range(1, 21)]
+        scored = [
+            _make_scored(rank=i, overall=1.0 - i * 0.01, drug_name=f"Drug{i}")
+            for i in range(1, 21)
+        ]
         output = await _collect_results(agent, scored)
         assert "showing top 10 of 20" in output
         assert "### 10." in output
@@ -293,17 +317,25 @@ class TestRenderResultsCap:
         assert "### 11." not in output
 
     async def test_remaining_summary_line(self, agent: SearchAgent):
-        scored = [_make_scored(rank=i, overall=1.0 - i * 0.01, drug_name=f"Drug{i}") for i in range(1, 51)]
+        scored = [
+            _make_scored(rank=i, overall=1.0 - i * 0.01, drug_name=f"Drug{i}")
+            for i in range(1, 51)
+        ]
         output = await _collect_results(agent, scored)
         assert "40 additional candidates scored below" in output
         assert "Results ranked by structural match and evidence depth." in output
 
     async def test_remaining_summary_singular(self, agent: SearchAgent):
-        scored = [_make_scored(rank=i, overall=1.0 - i * 0.01, drug_name=f"Drug{i}") for i in range(1, 12)]
+        scored = [
+            _make_scored(rank=i, overall=1.0 - i * 0.01, drug_name=f"Drug{i}")
+            for i in range(1, 12)
+        ]
         output = await _collect_results(agent, scored)
         assert "1 additional candidate scored below" in output
 
-    async def test_synthesis_section_preserved_no_contributing_sources(self, agent: SearchAgent):
+    async def test_synthesis_section_preserved_no_contributing_sources(
+        self, agent: SearchAgent
+    ):
         scored = [_make_scored(rank=1, overall=0.5, drug_name="X")]
         output = await _collect_results(agent, scored)
         # Contributing Sources section was removed (redundant with per-candidate links)
@@ -311,7 +343,10 @@ class TestRenderResultsCap:
         assert "## Synthesis Summary" in output
 
     async def test_exactly_10_no_cap_message(self, agent: SearchAgent):
-        scored = [_make_scored(rank=i, overall=1.0 - i * 0.05, drug_name=f"Drug{i}") for i in range(1, 11)]
+        scored = [
+            _make_scored(rank=i, overall=1.0 - i * 0.05, drug_name=f"Drug{i}")
+            for i in range(1, 11)
+        ]
         output = await _collect_results(agent, scored)
         assert "10 total" in output
         assert "additional candidate" not in output
@@ -455,18 +490,39 @@ class TestScoreBreakdown:
             semantic_score=0.85,
             structured_score=0.72,
             evidence_score=0.91,
-            suppression_metadata={"threshold": 0.45, "suppressed": False, "query_type": "biosimilar_screen"},
+            suppression_metadata={
+                "threshold": 0.45,
+                "suppressed": False,
+                "query_type": "biosimilar_screen",
+            },
             matched_dimensions=["target", "indication"],
             missed_dimensions=["drug_name"],
             concrete_labels={"target": ["TNF"], "indication": ["rheumatoid arthritis"]},
-            match_explanations={"matched_dimensions": ["target"], "missed_dimensions": []},
-            evidence_summary={"trial_count": 3, "article_count": 2, "patent_count": 1, "latest_trial_phase": "Phase III"},
+            match_explanations={
+                "matched_dimensions": ["target"],
+                "missed_dimensions": [],
+            },
+            evidence_summary={
+                "trial_count": 3,
+                "article_count": 2,
+                "patent_count": 1,
+                "latest_trial_phase": "Phase III",
+            },
         )
         output = renderer.render(_make_trace(), [result])
-        assert "**Matched dimensions:** Target (TNF), Indication (rheumatoid arthritis)" in output
+        assert (
+            "**Matched dimensions:** Target (TNF), Indication (rheumatoid arthritis)"
+            in output
+        )
         assert "**Missed dimensions:** Drug name" in output
-        assert "**Suppression:** threshold: 0.45, suppressed: no, query type: biosimilar_screen" in output
-        assert "**Evidence summary:** trials: 3, articles: 2, patents: 1, latest trial phase: Phase III" in output
+        assert (
+            "**Suppression:** threshold: 0.45, suppressed: no, query type: biosimilar_screen"
+            in output
+        )
+        assert (
+            "**Evidence summary:** trials: 3, articles: 2, patents: 1, latest trial phase: Phase III"
+            in output
+        )
 
 
 class TestPatentUrlColumn:
@@ -581,7 +637,9 @@ class TestCommercialRendering:
 
     def test_no_revenue_omits_commercial_line(self):
         renderer = ResultRenderer()
-        result = _ResultStub(drug_name="DrugNoRevenue", annual_revenue_usd_millions=None)
+        result = _ResultStub(
+            drug_name="DrugNoRevenue", annual_revenue_usd_millions=None
+        )
         output = renderer.render(_make_trace(), [result])
         assert "**Commercial:**" not in output
 
@@ -591,9 +649,18 @@ class TestSourceLinks:
 
     def test_known_domains_get_canonical_labels(self):
         assert _url_label("https://pubmed.ncbi.nlm.nih.gov/12345678/") == "PubMed"
-        assert _url_label("https://clinicaltrials.gov/ct2/show/NCT01234567") == "ClinicalTrials.gov"
-        assert _url_label("https://patents.google.com/patent/US1234567") == "Google Patents"
-        assert _url_label("https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm") == "DailyMed"
+        assert (
+            _url_label("https://clinicaltrials.gov/ct2/show/NCT01234567")
+            == "ClinicalTrials.gov"
+        )
+        assert (
+            _url_label("https://patents.google.com/patent/US1234567")
+            == "Google Patents"
+        )
+        assert (
+            _url_label("https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm")
+            == "DailyMed"
+        )
         assert _url_label("https://www.fda.gov/drugs/whatever") == "FDA"
 
     def test_unknown_domain_capitalizes_first_part(self):
@@ -611,4 +678,7 @@ class TestSourceLinks:
         )
         output = renderer.render(_make_trace(), [result])
         assert "[PubMed](https://pubmed.ncbi.nlm.nih.gov/99999999/)" in output
-        assert "[ClinicalTrials.gov](https://clinicaltrials.gov/ct2/show/NCT99999999)" in output
+        assert (
+            "[ClinicalTrials.gov](https://clinicaltrials.gov/ct2/show/NCT99999999)"
+            in output
+        )

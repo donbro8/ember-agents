@@ -63,9 +63,15 @@ def _parse_patent_row_from_bigquery(row: dict[str, Any]) -> PatentJurisdiction:
         country_code=country_code,
         country_name=country_name,
         publication_number=pub_number,
-        filing_date=date.fromisoformat(row["filing_date"]) if row.get("filing_date") else None,
-        grant_date=date.fromisoformat(row["grant_date"]) if row.get("grant_date") else None,
-        expiry_date=date.fromisoformat(row["expiry_date"]) if row.get("expiry_date") else None,
+        filing_date=date.fromisoformat(row["filing_date"])
+        if row.get("filing_date")
+        else None,
+        grant_date=date.fromisoformat(row["grant_date"])
+        if row.get("grant_date")
+        else None,
+        expiry_date=date.fromisoformat(row["expiry_date"])
+        if row.get("expiry_date")
+        else None,
         expiry_date_approximate=True,  # BigQuery-derived expiry is always approximate
         status=row["status"],
         title=row.get("title"),
@@ -115,14 +121,18 @@ class TestBigQueryPatentFixtures:
         rows = load_fixture("bigquery_patents_adalimumab")
         for row in rows:
             pj = _parse_patent_row_from_bigquery(row)
-            assert pj.country_code, f"country_code empty for {row['publication_number']}"
+            assert pj.country_code, (
+                f"country_code empty for {row['publication_number']}"
+            )
             assert len(pj.country_code) >= 2
 
     def test_country_name_populated(self) -> None:
         rows = load_fixture("bigquery_patents_adalimumab")
         for row in rows:
             pj = _parse_patent_row_from_bigquery(row)
-            assert pj.country_name, f"country_name empty for {row['publication_number']}"
+            assert pj.country_name, (
+                f"country_name empty for {row['publication_number']}"
+            )
 
     def test_expiry_date_present(self) -> None:
         rows = load_fixture("bigquery_patents_adalimumab")
@@ -198,7 +208,9 @@ class TestSeedPatentFixtures:
         for entry in entries:
             for country_code, expiry_str in entry.get("patent_expiries", {}).items():
                 pub_numbers = entry.get("key_patent_numbers", [])
-                pub_number = pub_numbers[0] if pub_numbers else f"{country_code}-UNKNOWN"
+                pub_number = (
+                    pub_numbers[0] if pub_numbers else f"{country_code}-UNKNOWN"
+                )
                 pj = _parse_patent_row_from_seed(country_code, expiry_str, pub_number)
                 assert isinstance(pj, PatentJurisdiction)
 
@@ -208,7 +220,9 @@ class TestSeedPatentFixtures:
         for entry in entries:
             for country_code, expiry_str in entry.get("patent_expiries", {}).items():
                 pub_numbers = entry.get("key_patent_numbers", [])
-                pub_number = pub_numbers[0] if pub_numbers else f"{country_code}-UNKNOWN"
+                pub_number = (
+                    pub_numbers[0] if pub_numbers else f"{country_code}-UNKNOWN"
+                )
                 pj = _parse_patent_row_from_seed(country_code, expiry_str, pub_number)
                 assert pj.expiry_date_approximate is False, (
                     f"Seed entry '{entry['drug_name']}' {country_code} should have "
@@ -309,7 +323,9 @@ class TestCanonicalIdStability:
 
         result = CandidateResult(
             drug_name=adalimumab["drug_name"],
-            fda_generic_name=adalimumab["drug_name"],  # seed drug_name is the generic name
+            fda_generic_name=adalimumab[
+                "drug_name"
+            ],  # seed drug_name is the generic name
             target=adalimumab["target_antigen"],
             sources_contributed=["biologic_seed"],
         )

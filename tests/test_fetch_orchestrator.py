@@ -52,7 +52,9 @@ def _make_provenance(source_name: str = "ClinicalTrials.gov") -> Any:
     )
 
 
-def _make_trial(interventions: list[str] | None = None, condition: str = "Breast Cancer") -> Any:
+def _make_trial(
+    interventions: list[str] | None = None, condition: str = "Breast Cancer"
+) -> Any:
     """Build a real Trial instance."""
     return Trial(
         nct_id=f"NCT{uuid.uuid4().hex[:8].upper()}",
@@ -109,7 +111,9 @@ class FakeSpec:
     approval_date_range: object = None
     jurisdictions: list = field(default_factory=list)
     max_results: int = 500
-    domains: list = field(default_factory=lambda: ["trials", "patents", "articles", "candidates"])
+    domains: list = field(
+        default_factory=lambda: ["trials", "patents", "articles", "candidates"]
+    )
 
 
 @dataclass
@@ -369,7 +373,10 @@ async def test_fetch_max_results_enforcement() -> None:
     """Fetch should respect max_results and return no more than that number."""
     pytest.importorskip("ember_data")
     ct_results = [
-        (_make_trial(interventions=[f"drug-{i}"]), _make_provenance("ClinicalTrials.gov"))
+        (
+            _make_trial(interventions=[f"drug-{i}"]),
+            _make_provenance("ClinicalTrials.gov"),
+        )
         for i in range(20)
     ]
     ct_client = _make_ct_client(results=ct_results)
@@ -521,7 +528,8 @@ async def test_fetch_bigquery_skips_patent_rows_without_filing_date() -> None:
 
     # The invalid row should be skipped — 0 patent candidates
     patent_sources = [
-        c for c in candidates
+        c
+        for c in candidates
         if any("Patent" in (s.source_name or "") for s in c.contributing_sources)
     ]
     assert len(patent_sources) == 0
@@ -633,7 +641,10 @@ async def test_clinicaltrials_uses_intervention_only_without_condition() -> None
     _, kwargs = ct_client.search.call_args
     assert kwargs.get("intervention") == "adalimumab"
     assert kwargs.get("term") is None
-    assert any(s.name == "clinicaltrials" and s.status == "ok" for s in orch.last_source_statuses)
+    assert any(
+        s.name == "clinicaltrials" and s.status == "ok"
+        for s in orch.last_source_statuses
+    )
 
 
 async def test_clinicaltrials_term_fallback_is_capped_and_marked_constrained() -> None:
@@ -649,7 +660,9 @@ async def test_clinicaltrials_term_fallback_is_capped_and_marked_constrained() -
         value: str = ""
 
     spec = FakeSpec(
-        target=FakeTargetSpec(label="PD-1", identifier="PDCD1", value="Programmed cell death 1"),
+        target=FakeTargetSpec(
+            label="PD-1", identifier="PDCD1", value="Programmed cell death 1"
+        ),
         indications=[],
         drug_names=[],
         resolved_terms=[
@@ -663,17 +676,16 @@ async def test_clinicaltrials_term_fallback_is_capped_and_marked_constrained() -
     orch = _make_orchestrator(ct_client=ct_client)
     await orch.fetch(spec)
 
-    term_calls = [
-        c for c in ct_client.search.call_args_list
-        if c.kwargs.get("term")
-    ]
+    term_calls = [c for c in ct_client.search.call_args_list if c.kwargs.get("term")]
     assert len(term_calls) == 2
     ct_statuses = [s for s in orch.last_source_statuses if s.name == "clinicaltrials"]
     assert ct_statuses
     assert ct_statuses[-1].status.startswith("ok_constrained")
 
 
-async def test_clinicaltrials_condition_path_not_marked_constrained_when_terms_capped() -> None:
+async def test_clinicaltrials_condition_path_not_marked_constrained_when_terms_capped() -> (
+    None
+):
     """Condition-based query path should not inherit constrained term-fallback status."""
     trial = _make_trial(interventions=["drug-y"])
     prov = _make_provenance("ClinicalTrials.gov")
@@ -686,7 +698,9 @@ async def test_clinicaltrials_condition_path_not_marked_constrained_when_terms_c
         value: str = ""
 
     spec = FakeSpec(
-        target=FakeTargetSpec(label="PD-1", identifier="PDCD1", value="Programmed cell death 1"),
+        target=FakeTargetSpec(
+            label="PD-1", identifier="PDCD1", value="Programmed cell death 1"
+        ),
         indications=[FakeIndication()],
         drug_names=[],
         resolved_terms=[

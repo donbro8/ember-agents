@@ -18,7 +18,10 @@ from ember_agents.agent import (
     _spec_to_classifications,
 )
 from ember_agents.render import ResultRenderer
-from ember_agents.search.classify import ClassificationOrchestrator, ClassificationResult
+from ember_agents.search.classify import (
+    ClassificationOrchestrator,
+    ClassificationResult,
+)
 from ember_agents.synthesis import ResultSynthesizer, SynthesisOutput
 from ember_agents.search.fetch import FetchOrchestrator, FetchResult
 from ember_agents.search.gate import GateResult, SearchGate
@@ -76,10 +79,14 @@ class FakeSearchSpec:
     patent_expiry_window: object = None
     jurisdictions: list = field(default_factory=list)
     max_results: int = 500
-    domains: list = field(default_factory=lambda: ["trials", "patents", "articles", "candidates"])
+    domains: list = field(
+        default_factory=lambda: ["trials", "patents", "articles", "candidates"]
+    )
 
 
-def _make_signals(query_type: str = "drug_lookup", drug_name: list | None = None) -> RawSignals:
+def _make_signals(
+    query_type: str = "drug_lookup", drug_name: list | None = None
+) -> RawSignals:
     """Build a minimal RawSignals fixture."""
     return RawSignals(
         target=[],
@@ -92,7 +99,9 @@ def _make_signals(query_type: str = "drug_lookup", drug_name: list | None = None
     )
 
 
-def _make_scored(drug_name: str | None = None, overall_score: float = 0.5) -> ScoredCandidate:
+def _make_scored(
+    drug_name: str | None = None, overall_score: float = 0.5
+) -> ScoredCandidate:
     """Build a minimal ScoredCandidate fixture."""
     cand = FakeCandidate(drug_name=drug_name)
     return ScoredCandidate(
@@ -488,7 +497,9 @@ class TestCandidateResultConversion:
 
     def test_candidate_to_result_risk_flags(self):
         """Risk flags are copied from candidate to result."""
-        cand = FakeCandidate(drug_name="risky_drug", risk_flags=["IP_RISK", "GENERIC_AVAILABLE"])
+        cand = FakeCandidate(
+            drug_name="risky_drug", risk_flags=["IP_RISK", "GENERIC_AVAILABLE"]
+        )
         scored = ScoredCandidate(candidate=cand, overall_score=0.4, rank=2)
         result = _candidate_to_result(scored)
         risk_flags = getattr(result, "risk_flags", [])
@@ -518,7 +529,9 @@ class TestResultRenderer:
     def test_render_empty_results(self):
         """Renderer emits 'No results found' when result list is empty."""
         renderer = ResultRenderer()
-        trace = ExecutionTrace(query_type="general", gate_outcome="passed", duration_seconds=0.1)
+        trace = ExecutionTrace(
+            query_type="general", gate_outcome="passed", duration_seconds=0.1
+        )
         output = renderer.render(trace, [])
         assert "No results found" in output
 
@@ -566,7 +579,9 @@ class TestResultRenderer:
             indication = None
 
         renderer = ResultRenderer()
-        trace = ExecutionTrace(query_type="drug_lookup", gate_outcome="passed", duration_seconds=0.3)
+        trace = ExecutionTrace(
+            query_type="drug_lookup", gate_outcome="passed", duration_seconds=0.3
+        )
         output = renderer.render(trace, [FakeResult()])
         assert "bevacizumab" in output
         assert "Results" in output
@@ -599,7 +614,9 @@ class TestResultRenderer:
                 indication = None
 
             renderer = ResultRenderer()
-            trace = ExecutionTrace(query_type="drug_lookup", gate_outcome="passed", duration_seconds=0.2)
+            trace = ExecutionTrace(
+                query_type="drug_lookup", gate_outcome="passed", duration_seconds=0.2
+            )
             output = renderer.render(trace, [FakeResult()])
             assert "United States" in output
             assert "active" in output
@@ -615,7 +632,9 @@ class TestResultRenderer:
 class TestHelpers:
     def test_signals_to_dict_omits_empty(self):
         """_signals_to_dict only includes dimensions with values."""
-        signals = RawSignals(target=["HER2"], modality=[], indication=[], query_type="drug_lookup")
+        signals = RawSignals(
+            target=["HER2"], modality=[], indication=[], query_type="drug_lookup"
+        )
         d = _signals_to_dict(signals)
         assert "target" in d
         assert "modality" not in d
@@ -821,14 +840,18 @@ class TestResultRendererSynthesis:
     def test_render_without_synthesis_overview(self):
         """Renderer does not include Analysis section when synthesis_overview is None."""
         renderer = ResultRenderer()
-        trace = ExecutionTrace(query_type="general", gate_outcome="passed", duration_seconds=0.1)
+        trace = ExecutionTrace(
+            query_type="general", gate_outcome="passed", duration_seconds=0.1
+        )
         output = renderer.render(trace, [])
         assert "## Analysis" not in output
 
     def test_render_with_synthesis_overview(self):
         """Renderer includes Analysis section when synthesis_overview is provided."""
         renderer = ResultRenderer()
-        trace = ExecutionTrace(query_type="general", gate_outcome="passed", duration_seconds=0.1)
+        trace = ExecutionTrace(
+            query_type="general", gate_outcome="passed", duration_seconds=0.1
+        )
         output = renderer.render(trace, [], synthesis_overview="Key insights here.")
         assert "## Analysis" in output
         assert "Key insights here." in output

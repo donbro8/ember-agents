@@ -99,7 +99,9 @@ def _compute_population_rates(results: list[CandidateResult]) -> dict[str, float
         return {}
 
     rates: dict[str, float] = {}
-    all_fields = ALWAYS_REQUIRED + REQUIRED_FOR_DRUG + ["indication", "mechanism_of_action"]
+    all_fields = (
+        ALWAYS_REQUIRED + REQUIRED_FOR_DRUG + ["indication", "mechanism_of_action"]
+    )
 
     for fname in all_fields:
         populated = sum(1 for r in results if _field_populated(r, fname))
@@ -145,7 +147,9 @@ def test_dir007_biosimilar_query_returns_at_least_five_candidates() -> None:
     """DIR-007 fixture query should return >= 5 qualifying candidates."""
     query = "biosimilar opportunities for biologics with revenue over 1 billion"
     results = _collect_results(query)
-    assert len(results) >= 5, f"Expected >=5 candidates for {query!r}, got {len(results)}"
+    assert len(results) >= 5, (
+        f"Expected >=5 candidates for {query!r}, got {len(results)}"
+    )
 
 
 @pytest.mark.integration
@@ -184,7 +188,9 @@ def test_drug_results_have_drug_name(query: str) -> None:
                 )
 
     if failures:
-        msg = f"Query {query!r} — DRUG results missing drug_name:\n" + "\n".join(failures)
+        msg = f"Query {query!r} — DRUG results missing drug_name:\n" + "\n".join(
+            failures
+        )
         pytest.fail(msg)
 
 
@@ -218,9 +224,8 @@ def test_patent_jurisdiction_field_completeness(query: str) -> None:
                     )
 
     if failures:
-        msg = (
-            f"Query {query!r} — patent jurisdiction field gaps:\n"
-            + "\n".join(failures)
+        msg = f"Query {query!r} — patent jurisdiction field gaps:\n" + "\n".join(
+            failures
         )
         pytest.fail(msg)
 
@@ -266,7 +271,9 @@ def test_completeness_regression(query: str) -> None:
     """Population rates must not drop more than REGRESSION_THRESHOLD_PP below baseline."""
     baselines = _load_baselines()
     if not baselines or query not in baselines:
-        pytest.skip(f"No baseline data for query {query!r} — run completeness_report.py first")
+        pytest.skip(
+            f"No baseline data for query {query!r} — run completeness_report.py first"
+        )
 
     query_baseline = baselines[query]
     results = _collect_results(query)
@@ -289,9 +296,8 @@ def test_completeness_regression(query: str) -> None:
             )
 
     if failures:
-        msg = (
-            f"Query {query!r} — completeness regression detected:\n"
-            + "\n".join(failures)
+        msg = f"Query {query!r} — completeness regression detected:\n" + "\n".join(
+            failures
         )
         pytest.fail(msg)
 

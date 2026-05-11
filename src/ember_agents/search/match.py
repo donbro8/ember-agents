@@ -74,7 +74,9 @@ except ImportError:  # pragma: no cover — ember-data not installed in this env
         approval_date_range: object = None
         jurisdictions: list = field(default_factory=list)
         max_results: int = 500
-        domains: list = field(default_factory=lambda: ["trials", "patents", "articles", "candidates"])
+        domains: list = field(
+            default_factory=lambda: ["trials", "patents", "articles", "candidates"]
+        )
 
     @dataclass  # type: ignore[no-redef]
     class CandidateScores:  # type: ignore[no-redef]
@@ -307,7 +309,9 @@ def _build_candidate_document(candidate: Any) -> str:
     for trial in list(getattr(candidate, "trials", []) or [])[:_MAX_TRIALS]:
         phase = getattr(trial, "phase", None)
         status = getattr(trial, "status", None)
-        condition = getattr(trial, "condition", None) or getattr(trial, "conditions", None)
+        condition = getattr(trial, "condition", None) or getattr(
+            trial, "conditions", None
+        )
         if condition and isinstance(condition, list):
             condition = " ".join(str(c) for c in condition[:3])
         bits = [str(x) for x in [phase, status, condition] if x]
@@ -332,7 +336,11 @@ def _build_candidate_document(candidate: Any) -> str:
         if abstract:
             parts.append(f"article abstract: {str(abstract)[:300]}")
 
-    return "\n".join(parts) if parts else (drug_name or getattr(candidate, "id", "unknown"))
+    return (
+        "\n".join(parts)
+        if parts
+        else (drug_name or getattr(candidate, "id", "unknown"))
+    )
 
 
 def _build_query_document(query_text: str, spec: Any) -> str:
@@ -476,7 +484,9 @@ def _score_structured(
     # --- Drug name match ---
     drug_name_norm = _normalize(getattr(candidate, "drug_name", None))
     if drug_name_norm:
-        canonical_drug = _resolve_name_via_synonyms(drug_name_norm, atc_table, uniprot_table)
+        canonical_drug = _resolve_name_via_synonyms(
+            drug_name_norm, atc_table, uniprot_table
+        )
     else:
         canonical_drug = ""
 
@@ -498,7 +508,11 @@ def _score_structured(
         for attr in ("label", "identifier", "value"):
             val = getattr(spec_target, attr, None)
             if val:
-                spec_target_labels.add(_resolve_name_via_synonyms(_normalize(val), atc_table, uniprot_table))
+                spec_target_labels.add(
+                    _resolve_name_via_synonyms(
+                        _normalize(val), atc_table, uniprot_table
+                    )
+                )
 
         cand_target = getattr(candidate, "target", None)
         cand_target_hit = 0.0
@@ -506,16 +520,22 @@ def _score_structured(
             for attr in ("label", "name", "identifier", "gene_name"):
                 val = getattr(cand_target, attr, None)
                 if val:
-                    norm = _resolve_name_via_synonyms(_normalize(val), atc_table, uniprot_table)
+                    norm = _resolve_name_via_synonyms(
+                        _normalize(val), atc_table, uniprot_table
+                    )
                     if norm in spec_target_labels:
                         cand_target_hit = 1.0
                         break
             # Also check aliases / synonyms on the candidate target
             if cand_target_hit == 0.0:
-                aliases = getattr(cand_target, "aliases", None) or getattr(cand_target, "synonyms", None)
+                aliases = getattr(cand_target, "aliases", None) or getattr(
+                    cand_target, "synonyms", None
+                )
                 if aliases:
                     for alias in list(aliases):
-                        norm = _resolve_name_via_synonyms(_normalize(alias), atc_table, uniprot_table)
+                        norm = _resolve_name_via_synonyms(
+                            _normalize(alias), atc_table, uniprot_table
+                        )
                         if norm in spec_target_labels:
                             cand_target_hit = 1.0
                             break
@@ -536,7 +556,9 @@ def _score_structured(
         ind_hit = 0.0
         for ind_label in spec_indications:
             for cand_text in candidate_texts:
-                if _phrase_match(ind_label, cand_text) or _single_token_match(ind_label, cand_text):
+                if _phrase_match(ind_label, cand_text) or _single_token_match(
+                    ind_label, cand_text
+                ):
                     ind_hit = 1.0
                     break
             if ind_hit == 1.0:
@@ -551,14 +573,20 @@ def _score_structured(
         for attr in ("label", "identifier", "value"):
             val = getattr(spec_ta, attr, None)
             if val:
-                spec_ta_labels.add(_resolve_name_via_synonyms(_normalize(val), atc_table, uniprot_table))
+                spec_ta_labels.add(
+                    _resolve_name_via_synonyms(
+                        _normalize(val), atc_table, uniprot_table
+                    )
+                )
 
         ta_hit = 0.0
         candidate_texts = _collect_candidate_indication_texts(candidate)
         if spec_ta_labels and candidate_texts:
             for ta_label in spec_ta_labels:
                 for cand_text in candidate_texts:
-                    if _phrase_match(ta_label, cand_text) or _single_token_match(ta_label, cand_text):
+                    if _phrase_match(ta_label, cand_text) or _single_token_match(
+                        ta_label, cand_text
+                    ):
                         ta_hit = 1.0
                         break
                 if ta_hit == 1.0:
@@ -612,11 +640,7 @@ def _compute_overall(
     0.65 / 0.35 rebalance is preserved regardless of any weight overrides.
     """
     if _CHROMA_AVAILABLE:
-        return (
-            w_semantic * semantic
-            + w_structured * structured
-            + w_evidence * evidence
-        )
+        return w_semantic * semantic + w_structured * structured + w_evidence * evidence
     return 0.65 * structured + 0.35 * evidence
 
 
@@ -889,7 +913,9 @@ class MatchScorer:
             )
 
         # Sort by overall score descending, then by candidate id for determinism
-        scored.sort(key=lambda sc: (-sc.overall_score, str(getattr(sc.candidate, "id", ""))))
+        scored.sort(
+            key=lambda sc: (-sc.overall_score, str(getattr(sc.candidate, "id", "")))
+        )
 
         suppressed_count = sum(1 for sc in scored if sc.suppressed)
 

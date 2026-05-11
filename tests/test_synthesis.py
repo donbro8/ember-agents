@@ -46,7 +46,9 @@ def _make_candidates(n: int) -> list[FakeCandidate]:
     ]
 
 
-def _mock_llm_response(overview: str, per_candidate: dict, jurisdiction_insights: str | None = None) -> MagicMock:
+def _mock_llm_response(
+    overview: str, per_candidate: dict, jurisdiction_insights: str | None = None
+) -> MagicMock:
     """Create a mock LLM response with JSON content."""
     payload = {
         "overview": overview,
@@ -65,7 +67,9 @@ def synthesizer() -> ResultSynthesizer:
 
 
 @pytest.mark.asyncio
-async def test_synthesize_returns_populated_output(synthesizer: ResultSynthesizer) -> None:
+async def test_synthesize_returns_populated_output(
+    synthesizer: ResultSynthesizer,
+) -> None:
     """synthesize() should return a populated SynthesisOutput from mocked LLM."""
     candidates = _make_candidates(3)
     per_cand = {c.canonical_id: f"{c.drug_name} is notable." for c in candidates}
@@ -91,7 +95,9 @@ async def test_synthesize_returns_populated_output(synthesizer: ResultSynthesize
 
 
 @pytest.mark.asyncio
-async def test_graceful_degradation_on_llm_error(synthesizer: ResultSynthesizer) -> None:
+async def test_graceful_degradation_on_llm_error(
+    synthesizer: ResultSynthesizer,
+) -> None:
     """synthesize() should return safe defaults when LLM raises."""
     synthesizer._llm.ainvoke = AsyncMock(side_effect=RuntimeError("API unavailable"))
 
@@ -152,11 +158,13 @@ async def test_empty_results_list(synthesizer: ResultSynthesizer) -> None:
 @pytest.mark.asyncio
 async def test_handles_markdown_fenced_response(synthesizer: ResultSynthesizer) -> None:
     """synthesize() should strip markdown fences from LLM response."""
-    payload = json.dumps({
-        "overview": "Fenced response.",
-        "per_candidate": {"CAND-000": "interesting"},
-        "jurisdiction_insights": None,
-    })
+    payload = json.dumps(
+        {
+            "overview": "Fenced response.",
+            "per_candidate": {"CAND-000": "interesting"},
+            "jurisdiction_insights": None,
+        }
+    )
     resp = MagicMock()
     resp.content = f"```json\n{payload}\n```"
     synthesizer._llm.ainvoke = AsyncMock(return_value=resp)
@@ -173,7 +181,9 @@ async def test_handles_markdown_fenced_response(synthesizer: ResultSynthesizer) 
 
 
 @pytest.mark.asyncio
-async def test_malformed_json_degrades_gracefully(synthesizer: ResultSynthesizer) -> None:
+async def test_malformed_json_degrades_gracefully(
+    synthesizer: ResultSynthesizer,
+) -> None:
     """synthesize() should degrade gracefully on malformed JSON from LLM."""
     resp = MagicMock()
     resp.content = "not valid json at all"
@@ -193,6 +203,7 @@ async def test_malformed_json_degrades_gracefully(synthesizer: ResultSynthesizer
 # ---------------------------------------------------------------------------
 # ChangeSummarizer tests
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class FakeChangeEntry:
@@ -231,7 +242,9 @@ def change_summarizer() -> ChangeSummarizer:
 
 
 @pytest.mark.asyncio
-async def test_summarize_changes_returns_llm_summary(change_summarizer: ChangeSummarizer) -> None:
+async def test_summarize_changes_returns_llm_summary(
+    change_summarizer: ChangeSummarizer,
+) -> None:
     """summarize_changes() should return the LLM-generated summary."""
     changes = _make_changes(2)
     resp = MagicMock()
@@ -250,7 +263,9 @@ async def test_summarize_changes_returns_llm_summary(change_summarizer: ChangeSu
 
 
 @pytest.mark.asyncio
-async def test_summarize_changes_graceful_degradation(change_summarizer: ChangeSummarizer) -> None:
+async def test_summarize_changes_graceful_degradation(
+    change_summarizer: ChangeSummarizer,
+) -> None:
     """summarize_changes() should return plaintext fallback when LLM raises."""
     changes = _make_changes(2)
     change_summarizer._llm.ainvoke = AsyncMock(side_effect=RuntimeError("API down"))
@@ -268,7 +283,9 @@ async def test_summarize_changes_graceful_degradation(change_summarizer: ChangeS
 
 
 @pytest.mark.asyncio
-async def test_summarize_changes_empty_list(change_summarizer: ChangeSummarizer) -> None:
+async def test_summarize_changes_empty_list(
+    change_summarizer: ChangeSummarizer,
+) -> None:
     """summarize_changes() should return 'No changes' without calling LLM."""
     change_summarizer._llm.ainvoke = AsyncMock()
 
@@ -284,7 +301,9 @@ async def test_summarize_changes_empty_list(change_summarizer: ChangeSummarizer)
 
 
 @pytest.mark.asyncio
-async def test_summarize_changes_limits_results_to_top_5(change_summarizer: ChangeSummarizer) -> None:
+async def test_summarize_changes_limits_results_to_top_5(
+    change_summarizer: ChangeSummarizer,
+) -> None:
     """summarize_changes() should only include top 5 current_results in prompt."""
     changes = _make_changes(1)
     resp = MagicMock()
@@ -354,8 +373,12 @@ async def test_generate_digest_with_active_watches(
 ) -> None:
     """generate_digest() should return a complete DigestOutput from mocked LLM."""
     watches = [
-        _make_watch_input("PD-1 Watch", n_changes=3, change_summary="3 new candidates entered."),
-        _make_watch_input("HER2 Watch", n_changes=1, change_summary="Score shift detected."),
+        _make_watch_input(
+            "PD-1 Watch", n_changes=3, change_summary="3 new candidates entered."
+        ),
+        _make_watch_input(
+            "HER2 Watch", n_changes=1, change_summary="Score shift detected."
+        ),
         _make_watch_input("Stable Watch"),
     ]
     mock_resp = _mock_digest_response(

@@ -17,7 +17,9 @@ from ember_agents.search.urls import (
 
 class TestTrialUrl:
     def test_valid_nct_id(self) -> None:
-        assert trial_url("NCT12345678") == "https://clinicaltrials.gov/study/NCT12345678"
+        assert (
+            trial_url("NCT12345678") == "https://clinicaltrials.gov/study/NCT12345678"
+        )
 
     def test_empty_string_returns_none(self) -> None:
         assert trial_url("") is None
@@ -67,7 +69,9 @@ class TestUniprotUrl:
 
 class TestPatentUrl:
     def test_valid_publication_number(self) -> None:
-        assert patent_url("US1234567B2") == "https://patents.google.com/patent/US1234567B2"
+        assert (
+            patent_url("US1234567B2") == "https://patents.google.com/patent/US1234567B2"
+        )
 
     def test_empty_string_returns_none(self) -> None:
         assert patent_url("") is None

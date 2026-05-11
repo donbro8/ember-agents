@@ -67,7 +67,9 @@ except ImportError:  # pragma: no cover — ember-data not installed in this env
         approval_date_range: object = None
         jurisdictions: list = field(default_factory=list)
         max_results: int = 500
-        domains: list = field(default_factory=lambda: ["trials", "patents", "articles", "candidates"])
+        domains: list = field(
+            default_factory=lambda: ["trials", "patents", "articles", "candidates"]
+        )
 
     @dataclass  # type: ignore[no-redef]
     class SourceProvenance:  # type: ignore[no-redef]
@@ -437,7 +439,9 @@ class FetchOrchestrator:
                     )
             elif ext_source_names[idx] != "clinicaltrials":
                 self.last_source_statuses.append(
-                    SourceStatus(name=ext_source_names[idx], status="error", result_count=0)
+                    SourceStatus(
+                        name=ext_source_names[idx], status="error", result_count=0
+                    )
                 )
             # Exceptions from individual sources are silently dropped so that
             # partial results are still returned.
@@ -452,9 +456,7 @@ class FetchOrchestrator:
     # Source-specific fetchers
     # ------------------------------------------------------------------
 
-    async def _fetch_bigquery(
-        self, spec: SearchSpec, limit: int
-    ) -> list[FetchResult]:
+    async def _fetch_bigquery(self, spec: SearchSpec, limit: int) -> list[FetchResult]:
         """Fetch from BigQuery FDA labels and patents (serial, BigQuery-first)."""
         results: list[FetchResult] = []
 
@@ -464,7 +466,9 @@ class FetchOrchestrator:
         loop = asyncio.get_event_loop()
 
         # FDA drug labels
-        domains = getattr(spec, "domains", ["trials", "patents", "articles", "candidates"])
+        domains = getattr(
+            spec, "domains", ["trials", "patents", "articles", "candidates"]
+        )
         if "candidates" in domains or "trials" in domains:
             drug_names: list[str] = list(getattr(spec, "drug_names", []) or [])
             # Also try label of resolved target
@@ -499,9 +503,7 @@ class FetchOrchestrator:
             if patent_query:
                 date_window = getattr(spec, "patent_expiry_window", None)
                 jurisdictions_raw = getattr(spec, "jurisdictions", []) or []
-                jurisdictions = [
-                    getattr(j, "value", j) for j in jurisdictions_raw
-                ]
+                jurisdictions = [getattr(j, "value", j) for j in jurisdictions_raw]
 
                 try:
                     patent_rows: list[dict] = await loop.run_in_executor(
@@ -525,7 +527,9 @@ class FetchOrchestrator:
         """Fetch from ClinicalTrials.gov."""
         results: list[FetchResult] = []
 
-        domains = getattr(spec, "domains", ["trials", "patents", "articles", "candidates"])
+        domains = getattr(
+            spec, "domains", ["trials", "patents", "articles", "candidates"]
+        )
         if "trials" not in domains:
             self.last_source_statuses.append(
                 SourceStatus(name="clinicaltrials", status="skipped", result_count=0)
@@ -632,12 +636,16 @@ class FetchOrchestrator:
         elif constrained and used_term_fallback and status == "error":
             status = "error_constrained"
         self.last_source_statuses.append(
-            SourceStatus(name="clinicaltrials", status=status, result_count=len(results))
+            SourceStatus(
+                name="clinicaltrials", status=status, result_count=len(results)
+            )
         )
 
         return results
 
-    def _extract_target_term_queries(self, spec: SearchSpec, *, max_terms: int) -> tuple[list[str], bool]:
+    def _extract_target_term_queries(
+        self, spec: SearchSpec, *, max_terms: int
+    ) -> tuple[list[str], bool]:
         """Return target/mechanism fallback terms and whether truncation was applied."""
         all_terms: list[str] = []
         target = getattr(spec, "target", None)
@@ -666,9 +674,7 @@ class FetchOrchestrator:
         constrained = len(all_terms) > max_terms
         return all_terms[:max_terms], constrained
 
-    async def _fetch_uniprot(
-        self, spec: SearchSpec, limit: int
-    ) -> list[FetchResult]:
+    async def _fetch_uniprot(self, spec: SearchSpec, limit: int) -> list[FetchResult]:
         """Fetch target records from UniProt."""
         results: list[FetchResult] = []
 
@@ -701,7 +707,9 @@ class FetchOrchestrator:
             fetch_result = FetchResult(
                 drug_name=getattr(tgt, "name", "") or "",
                 synonyms=aliases,
-                target_id=getattr(tgt, "uniprot_id", "") or getattr(tgt, "id", "") or "",
+                target_id=getattr(tgt, "uniprot_id", "")
+                or getattr(tgt, "id", "")
+                or "",
                 target=tgt,
                 provenance=[provenance],
                 matched_dimensions=["target"],
@@ -710,13 +718,13 @@ class FetchOrchestrator:
 
         return results
 
-    async def _fetch_pubmed(
-        self, spec: SearchSpec, limit: int
-    ) -> list[FetchResult]:
+    async def _fetch_pubmed(self, spec: SearchSpec, limit: int) -> list[FetchResult]:
         """Fetch article records from PubMed."""
         results: list[FetchResult] = []
 
-        domains = getattr(spec, "domains", ["trials", "patents", "articles", "candidates"])
+        domains = getattr(
+            spec, "domains", ["trials", "patents", "articles", "candidates"]
+        )
         if "articles" not in domains:
             return results
 
@@ -934,9 +942,7 @@ class FetchOrchestrator:
             if registry.is_duplicate(fetch_result):
                 # Find the existing accumulator that owns these identifiers
                 # and merge into it — the dedup_key differs but names overlap.
-                matched_acc_key = self._find_matching_key(
-                    fetch_result, accumulators
-                )
+                matched_acc_key = self._find_matching_key(fetch_result, accumulators)
                 if matched_acc_key:
                     acc = accumulators[matched_acc_key]
                     acc["trials"].extend(fetch_result.trials)
@@ -1071,10 +1077,7 @@ class FetchOrchestrator:
         # Fall back to therapeutic area
         ta = getattr(spec, "therapeutic_area", None)
         if ta is not None:
-            label = (
-                getattr(ta, "label", None)
-                or getattr(ta, "value", None)
-            )
+            label = getattr(ta, "label", None) or getattr(ta, "value", None)
             if label:
                 return str(label)
 

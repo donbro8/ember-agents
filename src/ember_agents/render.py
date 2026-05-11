@@ -163,10 +163,13 @@ class ResultRenderer:
 
         # Filter: keep only results with at least one identifying field
         displayable = [
-            r for r in results
-            if (getattr(r, "display_label", None)
+            r
+            for r in results
+            if (
+                getattr(r, "display_label", None)
                 or getattr(r, "drug_name", None)
-                or getattr(r, "target", None))
+                or getattr(r, "target", None)
+            )
         ]
 
         total = len(results)
@@ -182,9 +185,15 @@ class ResultRenderer:
         lines: list[str] = [header]
 
         for i, result in enumerate(shown, start=1):
-            label = getattr(result, "display_label", None) or getattr(result, "drug_name", None) or "Unknown"
+            label = (
+                getattr(result, "display_label", None)
+                or getattr(result, "drug_name", None)
+                or "Unknown"
+            )
             overall_score = getattr(result, "overall_score", None)
-            score_str = f" — score: {overall_score:.3f}" if overall_score is not None else ""
+            score_str = (
+                f" — score: {overall_score:.3f}" if overall_score is not None else ""
+            )
             lines.append(f"\n### {i}. {label}{score_str}")
 
             target = getattr(result, "target", None)
@@ -229,7 +238,11 @@ class ResultRenderer:
                 matched_text: list[str] = []
                 for d in matched:
                     dim = str(d)
-                    labels = concrete_labels.get(dim) if isinstance(concrete_labels, dict) else None
+                    labels = (
+                        concrete_labels.get(dim)
+                        if isinstance(concrete_labels, dict)
+                        else None
+                    )
                     if labels:
                         joined = ", ".join(str(v) for v in labels if v)
                         matched_text.append(f"{_friendly_dimension(dim)} ({joined})")
@@ -277,9 +290,13 @@ class ResultRenderer:
                     trial_str += f" (latest: {latest_phase})"
                 evidence_parts.append(trial_str)
             if article_count:
-                evidence_parts.append(f"{article_count} article{'s' if article_count != 1 else ''}")
+                evidence_parts.append(
+                    f"{article_count} article{'s' if article_count != 1 else ''}"
+                )
             if patent_count:
-                evidence_parts.append(f"{patent_count} patent{'s' if patent_count != 1 else ''}")
+                evidence_parts.append(
+                    f"{patent_count} patent{'s' if patent_count != 1 else ''}"
+                )
             if evidence_parts:
                 lines.append(" · ".join(evidence_parts))
 
@@ -287,11 +304,17 @@ class ResultRenderer:
             if isinstance(evidence_summary, dict):
                 summary_parts: list[str] = []
                 if evidence_summary.get("trial_count") is not None:
-                    summary_parts.append(f"trials: {evidence_summary.get('trial_count')}")
+                    summary_parts.append(
+                        f"trials: {evidence_summary.get('trial_count')}"
+                    )
                 if evidence_summary.get("article_count") is not None:
-                    summary_parts.append(f"articles: {evidence_summary.get('article_count')}")
+                    summary_parts.append(
+                        f"articles: {evidence_summary.get('article_count')}"
+                    )
                 if evidence_summary.get("patent_count") is not None:
-                    summary_parts.append(f"patents: {evidence_summary.get('patent_count')}")
+                    summary_parts.append(
+                        f"patents: {evidence_summary.get('patent_count')}"
+                    )
                 latest_phase = evidence_summary.get("latest_trial_phase")
                 if latest_phase:
                     summary_parts.append(f"latest trial phase: {latest_phase}")
@@ -308,8 +331,12 @@ class ResultRenderer:
                     revenue_formatted += f" ({revenue_year})"
                 biosimilar_count = getattr(result, "biosimilar_competitor_count", None)
                 if biosimilar_count is None:
-                    biosimilar_competitors = getattr(result, "biosimilar_competitors", None)
-                    biosimilar_count = len(biosimilar_competitors) if biosimilar_competitors else 0
+                    biosimilar_competitors = getattr(
+                        result, "biosimilar_competitors", None
+                    )
+                    biosimilar_count = (
+                        len(biosimilar_competitors) if biosimilar_competitors else 0
+                    )
                 commercial_parts = [f"Revenue: {revenue_formatted}"]
                 if biosimilar_count:
                     commercial_parts.append(f"Biosimilars: {biosimilar_count} approved")
@@ -321,9 +348,13 @@ class ResultRenderer:
                 lines.append("| Jurisdiction | Expiry | Status | Link |")
                 lines.append("|---|---|---|---|")
                 for patent in patents:
-                    country = getattr(patent, "country_name", None) or getattr(patent, "country_code", "")
+                    country = getattr(patent, "country_name", None) or getattr(
+                        patent, "country_code", ""
+                    )
                     expiry = getattr(patent, "expiry_date", None)
-                    expiry_approximate = getattr(patent, "expiry_date_approximate", False)
+                    expiry_approximate = getattr(
+                        patent, "expiry_date_approximate", False
+                    )
                     if expiry:
                         expiry_str = str(expiry)
                         if expiry_approximate:
@@ -333,7 +364,9 @@ class ResultRenderer:
                     status = getattr(patent, "status", "unknown")
                     patent_url = getattr(patent, "url", None)
                     link_str = f"[Patent]({patent_url})" if patent_url else ""
-                    lines.append(f"| {country} | {expiry_str} | {status} | {link_str} |")
+                    lines.append(
+                        f"| {country} | {expiry_str} | {status} | {link_str} |"
+                    )
 
             # Source URLs
             source_urls = getattr(result, "source_urls", None) or []

@@ -118,7 +118,9 @@ class TestIntentExtractorContract:
     async def test_extract_biosimilar_screen_query_type(self):
         expected = RawSignals(query_type="biosimilar_screen", drug_name=[])
         extractor = self._make_extractor_with_mock(expected)
-        result = await extractor.extract("biosimilar opportunities for monoclonal antibodies")
+        result = await extractor.extract(
+            "biosimilar opportunities for monoclonal antibodies"
+        )
         assert result.query_type == "biosimilar_screen"
 
     async def test_extract_drug_lookup_sets_drug_name(self):

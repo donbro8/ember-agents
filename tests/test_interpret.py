@@ -66,7 +66,9 @@ async def test_intent_extractor_uses_structured_output(monkeypatch) -> None:
     )
     calls: list[dict] = []
     fake_chat = _FakeChatGoogleGenerativeAI(response, calls)
-    monkeypatch.setattr("ember_agents.search.interpret.ChatGoogleGenerativeAI", fake_chat)
+    monkeypatch.setattr(
+        "ember_agents.search.interpret.ChatGoogleGenerativeAI", fake_chat
+    )
 
     extractor = IntentExtractor(model_name="test-model")
     signals = await extractor.extract(
@@ -84,7 +86,9 @@ async def test_prompt_includes_temporal_mapping_rules(monkeypatch) -> None:
     response = RawSignals()
     calls: list[dict] = []
     fake_chat = _FakeChatGoogleGenerativeAI(response, calls)
-    monkeypatch.setattr("ember_agents.search.interpret.ChatGoogleGenerativeAI", fake_chat)
+    monkeypatch.setattr(
+        "ember_agents.search.interpret.ChatGoogleGenerativeAI", fake_chat
+    )
 
     extractor = IntentExtractor()
     llm = extractor._llm
@@ -102,7 +106,9 @@ async def test_query_type_drug_lookup(monkeypatch) -> None:
     response = RawSignals(query_type="drug_lookup", drug_name=["adalimumab"])
     calls: list[dict] = []
     fake_chat = _FakeChatGoogleGenerativeAI(response, calls)
-    monkeypatch.setattr("ember_agents.search.interpret.ChatGoogleGenerativeAI", fake_chat)
+    monkeypatch.setattr(
+        "ember_agents.search.interpret.ChatGoogleGenerativeAI", fake_chat
+    )
 
     extractor = IntentExtractor()
     signals = await extractor.extract("adalimumab")
@@ -116,7 +122,9 @@ async def test_query_type_opportunity_scan(monkeypatch) -> None:
     response = RawSignals(query_type="opportunity_scan")
     calls: list[dict] = []
     fake_chat = _FakeChatGoogleGenerativeAI(response, calls)
-    monkeypatch.setattr("ember_agents.search.interpret.ChatGoogleGenerativeAI", fake_chat)
+    monkeypatch.setattr(
+        "ember_agents.search.interpret.ChatGoogleGenerativeAI", fake_chat
+    )
 
     extractor = IntentExtractor()
     signals = await extractor.extract("PD-1 inhibitors expiring 2028")
@@ -129,7 +137,9 @@ async def test_query_type_biosimilar_screen(monkeypatch) -> None:
     response = RawSignals(query_type="biosimilar_screen")
     calls: list[dict] = []
     fake_chat = _FakeChatGoogleGenerativeAI(response, calls)
-    monkeypatch.setattr("ember_agents.search.interpret.ChatGoogleGenerativeAI", fake_chat)
+    monkeypatch.setattr(
+        "ember_agents.search.interpret.ChatGoogleGenerativeAI", fake_chat
+    )
 
     extractor = IntentExtractor()
     signals = await extractor.extract("biosimilar opportunities revenue >1B")
@@ -142,7 +152,9 @@ async def test_query_type_general(monkeypatch) -> None:
     response = RawSignals(query_type="general")
     calls: list[dict] = []
     fake_chat = _FakeChatGoogleGenerativeAI(response, calls)
-    monkeypatch.setattr("ember_agents.search.interpret.ChatGoogleGenerativeAI", fake_chat)
+    monkeypatch.setattr(
+        "ember_agents.search.interpret.ChatGoogleGenerativeAI", fake_chat
+    )
 
     extractor = IntentExtractor()
     signals = await extractor.extract("VEGF pathway")
@@ -155,7 +167,9 @@ async def test_prompt_includes_query_type_and_drug_name_rules(monkeypatch) -> No
     response = RawSignals()
     calls: list[dict] = []
     fake_chat = _FakeChatGoogleGenerativeAI(response, calls)
-    monkeypatch.setattr("ember_agents.search.interpret.ChatGoogleGenerativeAI", fake_chat)
+    monkeypatch.setattr(
+        "ember_agents.search.interpret.ChatGoogleGenerativeAI", fake_chat
+    )
 
     extractor = IntentExtractor()
     llm = extractor._llm

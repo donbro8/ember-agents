@@ -161,10 +161,14 @@ def _apply_biosimilar_filter(
         if not expiry_dates:
             continue
 
-        if patent_expiry_start is not None and not any(d >= patent_expiry_start for d in expiry_dates):
+        if patent_expiry_start is not None and not any(
+            d >= patent_expiry_start for d in expiry_dates
+        ):
             continue
 
-        if patent_expiry_cutoff is not None and not any(d <= patent_expiry_cutoff for d in expiry_dates):
+        if patent_expiry_cutoff is not None and not any(
+            d <= patent_expiry_cutoff for d in expiry_dates
+        ):
             continue
 
         result.append(entry)
@@ -193,7 +197,8 @@ def _entry_to_fetch_result(entry: Any) -> FetchResult:
         annual_revenue_usd_millions=getattr(entry, "annual_revenue_usd_millions", None),
         revenue_year=getattr(entry, "revenue_year", None),
         biosimilar_competitors=list(getattr(entry, "biosimilar_competitors", []) or []),
-        has_approved_biosimilar=getattr(entry, "has_approved_biosimilar", False) or False,
+        has_approved_biosimilar=getattr(entry, "has_approved_biosimilar", False)
+        or False,
         indications=list(getattr(entry, "indications", []) or []),
     )
 
@@ -256,7 +261,9 @@ class BiologicSeedSource:
                 raise ValueError(f"Expected 'entries' key with a list in {path}")
             raw = entries
         elif not isinstance(raw, list):
-            raise ValueError(f"Expected a JSON array or versioned object in {path}, got {type(raw).__name__}")
+            raise ValueError(
+                f"Expected a JSON array or versioned object in {path}, got {type(raw).__name__}"
+            )
 
         if _EMBER_DATA_AVAILABLE and BiologicEntry is not None:
             return [BiologicEntry.model_validate(item) for item in raw]

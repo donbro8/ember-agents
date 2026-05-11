@@ -132,9 +132,7 @@ async def test_confidence_exactly_at_threshold_is_not_ambiguous() -> None:
     assert DISAMBIGUATION_THRESHOLD == 0.8
 
     uniprot = FakeResolver(
-        results={
-            "CD19": [FakeCandidate(id="P15391", label="CD19", confidence=0.8)]
-        }
+        results={"CD19": [FakeCandidate(id="P15391", label="CD19", confidence=0.8)]}
     )
     orchestrator = _make_orchestrator(uniprot=uniprot)
 
@@ -190,7 +188,9 @@ async def test_modality_signals_go_to_resolved_terms() -> None:
     """Resolved modality terms go into resolved_terms; modality field stays None if id is not a valid ModalityClassification."""
     modality = FakeResolver(
         results={
-            "mAb": [FakeCandidate(id="MAB001", label="Monoclonal Antibody", confidence=0.95)]
+            "mAb": [
+                FakeCandidate(id="MAB001", label="Monoclonal Antibody", confidence=0.95)
+            ]
         }
     )
     orchestrator = _make_orchestrator(modality=modality)
