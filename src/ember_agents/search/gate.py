@@ -113,6 +113,32 @@ def _has_core_fields(spec: SearchSpec) -> bool:
     return False
 
 
+def _has_attribute_anchors(spec: SearchSpec) -> bool:
+    """Return True if DIR-007 structured attributes are present."""
+    modality = getattr(spec, "modality", None)
+    if modality is not None:
+        return True
+    cell_line_class = getattr(spec, "cell_line_class", None)
+    if cell_line_class:
+        return True
+    min_revenue = getattr(spec, "min_revenue_millions", None)
+    if min_revenue is not None:
+        return True
+    patent_window = getattr(spec, "patent_expiry_window", None)
+    if patent_window is not None:
+        if getattr(patent_window, "start", None) is not None:
+            return True
+        if getattr(patent_window, "end", None) is not None:
+            return True
+    jurisdictions = getattr(spec, "jurisdictions", None)
+    if jurisdictions:
+        return True
+    query_type = getattr(spec, "query_type", None)
+    if query_type in {"opportunity_scan", "biosimilar_screen"}:
+        return True
+    return False
+
+
 def _identify_broadest_dimension(spec: SearchSpec) -> str:
     """Return the dimension that most broadens the search (highest priority set field)."""
     for dim in _DIMENSION_PRIORITY:
@@ -176,8 +202,8 @@ class SearchGate:
         if pending:
             return GateResult(passed=False, reason="pending_disambiguations")
 
-        # 2. At least one core field is required.
-        if not _has_core_fields(spec):
+        # 2. At least one core field or structured attribute anchor is required.
+        if not _has_core_fields(spec) and not _has_attribute_anchors(spec):
             return GateResult(passed=False, reason="missing_core_fields")
 
         # 3. Estimate result count and check against max_results.

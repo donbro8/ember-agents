@@ -110,8 +110,12 @@ def _apply_biosimilar_filter(
     entries: list[Any],
     *,
     min_revenue_millions: float,
-    patent_expiry_cutoff: date,
+    patent_expiry_cutoff: date | None,
+    patent_expiry_start: date | None = None,
     jurisdictions: list[str] | None = None,
+    modality_categories: list[str] | None = None,
+    categories: list[str] | None = None,
+    cell_line_classes: list[str] | None = None,
 ) -> list[Any]:
     """Apply hard filters used in biosimilar_screen mode.
 
@@ -119,13 +123,31 @@ def _apply_biosimilar_filter(
     - annual_revenue_usd_millions >= min_revenue_millions
     - At least one jurisdiction has a patent expiry <= patent_expiry_cutoff
 
-    Cell-line class is not filtered here — that concern belongs to the agent.
+    Also applies optional modality/category/cell-line class filters when provided.
     """
     if jurisdictions is None:
         jurisdictions = ["US", "EU"]
+    modality_filter = {_norm(v) for v in (modality_categories or []) if _norm(v)}
+    category_filter = {_norm(v) for v in (categories or []) if _norm(v)}
+    cell_line_filter = {_norm(v) for v in (cell_line_classes or []) if _norm(v)}
 
     result: list[Any] = []
     for entry in entries:
+        if modality_filter:
+            entry_modality = _norm(getattr(entry, "modality", None))
+            if entry_modality not in modality_filter:
+                continue
+
+        if category_filter:
+            entry_category = _norm(getattr(entry, "category", None))
+            if entry_category not in category_filter:
+                continue
+
+        if cell_line_filter:
+            entry_cell_class = _norm(getattr(entry, "cell_line_class", None))
+            if entry_cell_class not in cell_line_filter:
+                continue
+
         revenue = entry.annual_revenue_usd_millions
         if revenue is None or revenue < min_revenue_millions:
             continue
@@ -139,7 +161,10 @@ def _apply_biosimilar_filter(
         if not expiry_dates:
             continue
 
-        if not any(d <= patent_expiry_cutoff for d in expiry_dates):
+        if patent_expiry_start is not None and not any(d >= patent_expiry_start for d in expiry_dates):
+            continue
+
+        if patent_expiry_cutoff is not None and not any(d <= patent_expiry_cutoff for d in expiry_dates):
             continue
 
         result.append(entry)
@@ -288,10 +313,14 @@ class BiologicSeedSource:
             else _DEFAULT_MIN_REVENUE
         )
 
-        expiry_cutoff = _DEFAULT_PATENT_EXPIRY_CUTOFF
+        expiry_cutoff: date | None = _DEFAULT_PATENT_EXPIRY_CUTOFF
+        expiry_start: date | None = None
         patent_expiry_window = getattr(spec, "patent_expiry_window", None)
         if patent_expiry_window is not None:
+            start = getattr(patent_expiry_window, "start", None)
             end = getattr(patent_expiry_window, "end", None)
+            if start is not None:
+                expiry_start = start
             if end is not None:
                 expiry_cutoff = end
 
@@ -304,11 +333,27 @@ class BiologicSeedSource:
                 for j in raw_jurisdictions
             ]
 
+        modality_categories = list(getattr(spec, "modality_categories", []) or [])
+        modality = getattr(spec, "modality", None)
+        if modality is not None and not modality_categories:
+            modality_val = getattr(modality, "value", modality)
+            if modality_val:
+                modality_categories = [str(modality_val)]
+        categories = list(getattr(spec, "categories", []) or [])
+        cell_line_classes = list(getattr(spec, "cell_line_classes", []) or [])
+        cell_line_class = getattr(spec, "cell_line_class", None)
+        if cell_line_class and not cell_line_classes:
+            cell_line_classes = [str(cell_line_class)]
+
         filtered = _apply_biosimilar_filter(
             self._entries,
             min_revenue_millions=min_revenue,
             patent_expiry_cutoff=expiry_cutoff,
+            patent_expiry_start=expiry_start,
             jurisdictions=jurisdictions,
+            modality_categories=modality_categories,
+            categories=categories,
+            cell_line_classes=cell_line_classes,
         )
 
         return [_entry_to_fetch_result(entry) for entry in filtered]

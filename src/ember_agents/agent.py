@@ -306,6 +306,10 @@ def _signals_to_dict(signals: RawSignals) -> dict:
         result["modality"] = signals.modality
     if signals.indication:
         result["indication"] = signals.indication
+    if signals.cell_line:
+        result["cell_line"] = signals.cell_line
+    if signals.jurisdiction:
+        result["jurisdiction"] = signals.jurisdiction
     if signals.commercial:
         result["commercial"] = signals.commercial
     if signals.temporal is not None:
@@ -345,6 +349,38 @@ def _spec_to_classifications(spec: Any) -> dict:
             classifications["indications"] = ind_labels
 
     return classifications
+
+
+def _gate_blocked_diagnostics(gate_reason: str, signals: RawSignals, spec: Any) -> str:
+    signal_dict = _signals_to_dict(signals)
+    lines = [f"> **Gate blocked:** {gate_reason}"]
+    if signal_dict:
+        lines.append(f"> Extracted signals: {signal_dict}")
+
+    if gate_reason == "missing_core_fields":
+        hints: list[str] = []
+        if not getattr(spec, "drug_names", None):
+            hints.append("drug name (e.g. adalimumab)")
+        if getattr(spec, "target", None) is None:
+            hints.append("target (e.g. PD-1)")
+        if not getattr(spec, "indications", None):
+            hints.append("indication (e.g. NSCLC)")
+        if getattr(spec, "modality", None) is None:
+            hints.append("modality (e.g. mAb)")
+        if getattr(spec, "min_revenue_millions", None) is None:
+            hints.append("commercial threshold (e.g. revenue > 1B)")
+        if getattr(spec, "patent_expiry_window", None) is None:
+            hints.append("patent window (e.g. after 2025 before 2028)")
+        if not getattr(spec, "jurisdictions", None):
+            hints.append("jurisdiction (e.g. US or EU)")
+        if not getattr(spec, "cell_line_class", None):
+            hints.append("cell-line class (e.g. mammalian)")
+        if hints:
+            lines.append("> Missing inputs: " + "; ".join(hints[:4]) + ".")
+    elif gate_reason == "pending_disambiguations":
+        lines.append("> Missing input: choose one of the disambiguation options and retry.")
+
+    return "\n".join(lines) + "\n"
 
 
 # ---------------------------------------------------------------------------
@@ -461,7 +497,7 @@ class EmberAgent(Agent):
             if gate_result.narrowing:
                 yield f"> **Search too broad** — {gate_result.narrowing.question}\n"
             else:
-                yield f"> **Gate blocked:** {gate_outcome}\n"
+                yield _gate_blocked_diagnostics(gate_outcome, signals, spec)
             # Still emit trace so caller can inspect what happened
             duration = time.monotonic() - start_time
             trace = ExecutionTrace(
@@ -659,7 +695,12 @@ class EmberAgent(Agent):
                 duration_seconds=duration,
             )
             rendered = self._renderer.render(trace, [])
-            markdown = f"# Ember Search: {query}\n\n{rendered}"
+            detail = (
+                f"> **Search too broad** — {gate_result.narrowing.question}\n\n"
+                if gate_result.narrowing is not None
+                else _gate_blocked_diagnostics(gate_outcome, signals, spec) + "\n"
+            )
+            markdown = f"# Ember Search: {query}\n\n{detail}{rendered}"
             return PipelineOutput(
                 markdown=markdown,
                 results=[],

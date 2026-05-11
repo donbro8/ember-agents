@@ -70,6 +70,26 @@ def _make_seed_data() -> list[dict]:
             "notes": "",
         },
         {
+            "drug_name": "EpsilonProtein",
+            "brand_names": ["EpsilonBrand"],
+            "originator": "EpsilonCo",
+            "target_antigen": "IL-17",
+            "modality": "protein",
+            "category": "fusion",
+            "cell_line": "E. coli",
+            "cell_line_class": "non-mammalian",
+            "indications": ["psoriasis"],
+            "annual_revenue_usd_millions": 1800.0,
+            "revenue_year": 2024,
+            "patent_expiries": {
+                "US": _NEAR_EXPIRY.isoformat(),
+            },
+            "key_patent_numbers": ["US9999905"],
+            "biosimilar_competitors": [],
+            "has_approved_biosimilar": False,
+            "notes": "",
+        },
+        {
             # Should be excluded from biosimilar_screen due to low revenue
             "drug_name": "GammaMab",
             "brand_names": [],
@@ -139,6 +159,10 @@ def _make_spec(**kwargs: Any) -> SimpleNamespace:
         "min_revenue_millions": None,
         "patent_expiry_window": None,
         "jurisdictions": [],
+        "modality_categories": [],
+        "categories": [],
+        "cell_line_classes": [],
+        "cell_line_class": None,
     }
     defaults.update(kwargs)
     return SimpleNamespace(**defaults)
@@ -151,7 +175,7 @@ def _make_spec(**kwargs: Any) -> SimpleNamespace:
 
 class TestBiologicSeedSourceInit:
     def test_loads_entries(self, source: BiologicSeedSource) -> None:
-        assert len(source._entries) == 4
+        assert len(source._entries) == 5
 
     def test_file_not_found_raises(self, tmp_path: Path) -> None:
         with pytest.raises(FileNotFoundError):
@@ -394,3 +418,18 @@ class TestBiosimilarScreenFilter:
         for r in results:
             assert isinstance(r.patents, list)
             assert len(r.patents) >= 1
+
+    @pytest.mark.asyncio
+    async def test_filters_modality_category_and_cell_line(self, source: BiologicSeedSource) -> None:
+        expiry_window = SimpleNamespace(start=date(2025, 1, 1), end=date(2028, 12, 31))
+        spec = _make_spec(
+            min_revenue_millions=1.0,
+            patent_expiry_window=expiry_window,
+            modality_categories=["mab"],
+            categories=["mab"],
+            cell_line_class="mammalian",
+        )
+        results = await source.fetch(spec, query_type="biosimilar_screen")
+        names = {r.drug_name for r in results}
+        assert "AlphaMab" in names
+        assert "EpsilonProtein" not in names

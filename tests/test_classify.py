@@ -282,3 +282,42 @@ async def test_indication_resolves_through_both_mesh_and_atc() -> None:
     assert result.spec.indications[0].identifier == "D001943"
     assert result.spec.therapeutic_area is not None
     assert result.spec.therapeutic_area.identifier == "L01XC"
+
+
+async def test_dir007_attribute_signals_mapped_into_spec() -> None:
+    orchestrator = _make_orchestrator()
+    signals = RawSignals(
+        modality=["mAb"],
+        cell_line=["mammalian cell line"],
+        jurisdiction=["US"],
+        commercial=["high-value", "revenue > 1B"],
+        temporal={"after": "2025-01-01", "before": "2028-01-01"},
+    )
+    result = await orchestrator.classify(signals)
+
+    assert getattr(result.spec, "min_revenue_millions", None) == 1000.0
+    assert getattr(result.spec, "jurisdictions", None) == ["US"]
+    assert getattr(result.spec, "query_type", None) == "general"
+    assert getattr(result.spec, "cell_line_class", None) == "mammalian"
+    window = getattr(result.spec, "patent_expiry_window", None)
+    assert window is not None
+    assert str(getattr(window, "start")) == "2025-01-01"
+    assert str(getattr(window, "end")) == "2028-01-01"
+
+
+async def test_dir007_cell_line_non_mammalian_normalizes_to_non_mammalian() -> None:
+    orchestrator = _make_orchestrator()
+    signals = RawSignals(cell_line=["nonmammalian cell line"])
+
+    result = await orchestrator.classify(signals)
+
+    assert getattr(result.spec, "cell_line_class", None) == "non-mammalian"
+
+
+async def test_dir007_cell_line_mammalian_still_normalizes_to_mammalian() -> None:
+    orchestrator = _make_orchestrator()
+    signals = RawSignals(cell_line=["mammalian cell line"])
+
+    result = await orchestrator.classify(signals)
+
+    assert getattr(result.spec, "cell_line_class", None) == "mammalian"

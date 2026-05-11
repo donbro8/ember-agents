@@ -185,14 +185,27 @@ async def test_gate_fails_when_no_core_fields() -> None:
     assert result.narrowing is None
 
 
-async def test_gate_fails_missing_core_fields_even_with_modality() -> None:
-    """Modality alone does not satisfy the core-field requirement."""
+async def test_gate_passes_with_modality_attribute_anchor() -> None:
+    """Modality-only structured opportunity queries are now allowed."""
     gate = _make_gate()
     spec = _spec(modality="mab")
     result = await gate.check(spec)
 
-    assert result.passed is False
-    assert result.reason == "missing_core_fields"
+    assert result.passed is True
+
+
+async def test_gate_passes_with_structured_attribute_anchors_only() -> None:
+    gate = _make_gate(estimate=5)
+    spec = _spec(
+        modality="mab",
+        cell_line_class="mammalian",
+        min_revenue_millions=1000.0,
+        patent_expiry_window={"start": "2025-01-01", "end": "2028-01-01"},
+        jurisdictions=["US"],
+        max_results=100,
+    )
+    result = await gate.check(spec)
+    assert result.passed is True
 
 
 # ---------------------------------------------------------------------------

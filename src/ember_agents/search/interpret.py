@@ -39,7 +39,13 @@ prose outside the JSON.
    "breast cancer", "type 2 diabetes", "haematology").  Extract verbatim or
    lightly normalised.
 
-4. **temporal** – Patent or exclusivity date window.  Map to a JSON object with
+4. **cell_line** – Cell line constraints (e.g. "CHO", "mammalian cell line",
+   "non-mammalian", "HEK293"). Extract verbatim or lightly normalised.
+
+5. **jurisdiction** – Patent/commercial jurisdiction constraints (e.g. "US",
+   "EU", "Japan", "global ex-US"). Extract jurisdiction tokens.
+
+6. **temporal** – Patent or exclusivity date window.  Map to a JSON object with
    three optional fields:
    - `before`: upper-bound date as "YYYY-MM-DD" (e.g. "before 2028" → "2028-01-01")
    - `after`:  lower-bound date as "YYYY-MM-DD" (e.g. "after 2020" → "2020-01-01")
@@ -48,7 +54,7 @@ prose outside the JSON.
    "between now and 2028" should produce after = today's date, before = 2028-01-01.
    If no temporal information is present, set temporal to null.
 
-5. **commercial** – Market, geography, or revenue constraints (e.g. "US", "EU",
+7. **commercial** – Market, geography, or revenue constraints (e.g. "US", "EU",
    "revenue > 1B", "top-selling").  Extract verbatim or lightly normalised.
 
 ## Query classification
@@ -101,6 +107,8 @@ class RawSignals(BaseModel):
     target: list[str] = Field(default_factory=list)
     modality: list[str] = Field(default_factory=list)
     indication: list[str] = Field(default_factory=list)
+    cell_line: list[str] = Field(default_factory=list)
+    jurisdiction: list[str] = Field(default_factory=list)
     temporal: TemporalSignal | None = None
     commercial: list[str] = Field(default_factory=list)
     query_type: str = Field(

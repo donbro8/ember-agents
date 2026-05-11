@@ -255,6 +255,8 @@ class TestEmberAgentPipeline:
 
         output = "".join(chunks)
         assert "missing_core_fields" in output or "Gate blocked" in output
+        assert "Extracted signals" in output
+        assert "Missing inputs" in output
         # Scorer must NOT have been called
         scorer.score.assert_not_called()
 
