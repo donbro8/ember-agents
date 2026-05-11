@@ -150,6 +150,22 @@ def source(seed_file: Path) -> BiologicSeedSource:
     return BiologicSeedSource(seed_file)
 
 
+@pytest.fixture()
+def reference_seed_source() -> BiologicSeedSource:
+    """Source backed by ember-data biologic reference for realistic filter assertions."""
+    seed_path = (
+        Path(__file__).resolve().parents[2]
+        / "ember-data"
+        / "src"
+        / "ember_data"
+        / "seed"
+        / "biologic_reference.json"
+    )
+    if not seed_path.exists():
+        pytest.skip(f"Missing seed fixture at {seed_path}")
+    return BiologicSeedSource(seed_path)
+
+
 def _make_spec(**kwargs: Any) -> SimpleNamespace:
     """Build a minimal duck-typed SearchSpec."""
     defaults = {
@@ -425,3 +441,56 @@ class TestBiosimilarScreenFilter:
         names = {r.drug_name for r in results}
         assert "AlphaMab" in names
         assert "EpsilonProtein" not in names
+
+    @pytest.mark.asyncio
+    async def test_modality_alias_monoclonal_antibody_matches_mab(
+        self, source: BiologicSeedSource
+    ) -> None:
+        expiry_window = SimpleNamespace(start=date(2025, 1, 1), end=date(2028, 12, 31))
+        spec_mab = _make_spec(
+            min_revenue_millions=1.0,
+            patent_expiry_window=expiry_window,
+            modality="mAb",
+            categories=["mAb"],
+            cell_line_class="mammalian",
+        )
+        spec_alias = _make_spec(
+            min_revenue_millions=1.0,
+            patent_expiry_window=expiry_window,
+            modality="monoclonal_antibody",
+            categories=["mAb"],
+            cell_line_class="mammalian",
+        )
+
+        results_mab = await source.fetch(spec_mab, query_type="biosimilar_screen")
+        results_alias = await source.fetch(spec_alias, query_type="biosimilar_screen")
+
+        names_mab = {r.drug_name for r in results_mab}
+        names_alias = {r.drug_name for r in results_alias}
+        assert names_alias == names_mab
+
+
+class TestOpportunityScanAttributeFilters:
+    @pytest.mark.asyncio
+    async def test_attribute_only_opportunity_scan_returns_seed_candidates(
+        self, reference_seed_source: BiologicSeedSource
+    ) -> None:
+        expiry_window = SimpleNamespace(start=date(2025, 1, 1), end=date(2028, 12, 31))
+        spec = _make_spec(
+            min_revenue_millions=1000.0,
+            patent_expiry_window=expiry_window,
+            modality="monoclonal_antibody",
+            categories=["mAb"],
+            cell_line_class="mammalian",
+        )
+
+        results = await reference_seed_source.fetch(spec, query_type="opportunity_scan")
+        assert len(results) >= 5
+
+    @pytest.mark.asyncio
+    async def test_non_attribute_opportunity_scan_without_names_stays_empty(
+        self, source: BiologicSeedSource
+    ) -> None:
+        spec = _make_spec()
+        results = await source.fetch(spec, query_type="opportunity_scan")
+        assert results == []

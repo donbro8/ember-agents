@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ember-bio-agents"
-version = "0.2.4"
+version = "0.2.5"
 description = "LangGraph agents and orchestration for Ember Bio"
 requires-python = ">=3.11"
 dependencies = [

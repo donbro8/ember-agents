@@ -26,6 +26,16 @@ except ImportError:  # pragma: no cover
 
 _DEFAULT_MIN_REVENUE: float = 1.0
 _DEFAULT_PATENT_EXPIRY_CUTOFF: date = date(2028, 12, 31)
+_OPPORTUNITY_ATTRIBUTE_FIELDS: tuple[str, ...] = (
+    "min_revenue_millions",
+    "patent_expiry_window",
+    "cell_line_class",
+    "cell_line_classes",
+    "modality",
+    "modality_categories",
+    "categories",
+    "jurisdictions",
+)
 
 # Dimension tag used in FetchResult.matched_dimensions
 _SOURCE_NAME = "biologic_seed"
@@ -106,6 +116,28 @@ def _matches_spec(entry: Any, query_tokens: set[str]) -> bool:
     return bool(entry_tokens & query_tokens)
 
 
+def _canonical_modality(value: str | None) -> str:
+    """Canonical modality token for filter comparison."""
+    token = _norm(value).replace("_", " ")
+    if token in {"mab", "monoclonal antibody"}:
+        return "mab"
+    return token
+
+
+def _has_opportunity_attributes(spec: Any) -> bool:
+    """Whether *spec* carries non-name opportunity filter dimensions."""
+    for field in _OPPORTUNITY_ATTRIBUTE_FIELDS:
+        value = getattr(spec, field, None)
+        if value is None:
+            continue
+        if isinstance(value, str) and not value.strip():
+            continue
+        if isinstance(value, (list, tuple, set, dict)) and not value:
+            continue
+        return True
+    return False
+
+
 def _apply_biosimilar_filter(
     entries: list[Any],
     *,
@@ -127,14 +159,18 @@ def _apply_biosimilar_filter(
     """
     if jurisdictions is None:
         jurisdictions = ["US", "EU"]
-    modality_filter = {_norm(v) for v in (modality_categories or []) if _norm(v)}
+    modality_filter = {
+        _canonical_modality(v)
+        for v in (modality_categories or [])
+        if _canonical_modality(v)
+    }
     category_filter = {_norm(v) for v in (categories or []) if _norm(v)}
     cell_line_filter = {_norm(v) for v in (cell_line_classes or []) if _norm(v)}
 
     result: list[Any] = []
     for entry in entries:
         if modality_filter:
-            entry_modality = _norm(getattr(entry, "modality", None))
+            entry_modality = _canonical_modality(getattr(entry, "modality", None))
             if entry_modality not in modality_filter:
                 continue
 
@@ -291,6 +327,9 @@ class BiologicSeedSource:
             PatentJurisdiction entries.
         """
         if query_type == "biosimilar_screen":
+            return self._fetch_biosimilar_screen(spec)
+
+        if query_type == "opportunity_scan" and _has_opportunity_attributes(spec):
             return self._fetch_biosimilar_screen(spec)
 
         return self._fetch_by_name(spec)
