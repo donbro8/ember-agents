@@ -22,6 +22,14 @@ _KNOWN_DOMAIN_LABELS: dict[str, str] = {
     "fda.gov": "FDA",
 }
 
+_DIMENSION_LABELS: dict[str, str] = {
+    "target": "Target",
+    "drug_name": "Drug name",
+    "indication": "Indication",
+    "therapeutic_area": "Therapeutic area",
+    "modality": "Modality",
+}
+
 
 def _url_label(url: str) -> str:
     """Derive a human-readable label from a URL.
@@ -56,6 +64,11 @@ def _url_label(url: str) -> str:
     # Default: capitalize first part of domain
     first_part = hostname.split(".")[0] if hostname else url
     return first_part.capitalize() if first_part else url
+
+
+def _friendly_dimension(dim: str) -> str:
+    key = (dim or "").strip().lower()
+    return _DIMENSION_LABELS.get(key, dim.replace("_", " ").capitalize())
 
 
 class ResultRenderer:
@@ -204,6 +217,44 @@ class ResultRenderer:
             if score_parts:
                 lines.append(f"**Scores:** {', '.join(score_parts)}")
 
+            matched = getattr(result, "matched_dimensions", None)
+            missed = getattr(result, "missed_dimensions", None)
+            match_explanations = getattr(result, "match_explanations", None)
+            if not matched and isinstance(match_explanations, dict):
+                matched = match_explanations.get("matched_dimensions") or []
+            if not missed and isinstance(match_explanations, dict):
+                missed = match_explanations.get("missed_dimensions") or []
+            concrete_labels = getattr(result, "concrete_labels", None) or {}
+            if matched:
+                matched_text: list[str] = []
+                for d in matched:
+                    dim = str(d)
+                    labels = concrete_labels.get(dim) if isinstance(concrete_labels, dict) else None
+                    if labels:
+                        joined = ", ".join(str(v) for v in labels if v)
+                        matched_text.append(f"{_friendly_dimension(dim)} ({joined})")
+                    else:
+                        matched_text.append(_friendly_dimension(dim))
+                lines.append(f"**Matched dimensions:** {', '.join(matched_text)}")
+            if missed:
+                missed_labels = ", ".join(_friendly_dimension(str(d)) for d in missed)
+                lines.append(f"**Missed dimensions:** {missed_labels}")
+
+            suppression_metadata = getattr(result, "suppression_metadata", None)
+            if isinstance(suppression_metadata, dict):
+                threshold = suppression_metadata.get("threshold")
+                suppressed = suppression_metadata.get("suppressed")
+                query_type = suppression_metadata.get("query_type")
+                meta_parts: list[str] = []
+                if isinstance(threshold, int | float):
+                    meta_parts.append(f"threshold: {float(threshold):.2f}")
+                if isinstance(suppressed, bool):
+                    meta_parts.append(f"suppressed: {'yes' if suppressed else 'no'}")
+                if query_type:
+                    meta_parts.append(f"query type: {query_type}")
+                if meta_parts:
+                    lines.append(f"**Suppression:** {', '.join(meta_parts)}")
+
             # Evidence counts line
             trial_count = getattr(result, "trial_count", None)
             if trial_count is None:
@@ -231,6 +282,21 @@ class ResultRenderer:
                 evidence_parts.append(f"{patent_count} patent{'s' if patent_count != 1 else ''}")
             if evidence_parts:
                 lines.append(" · ".join(evidence_parts))
+
+            evidence_summary = getattr(result, "evidence_summary", None)
+            if isinstance(evidence_summary, dict):
+                summary_parts: list[str] = []
+                if evidence_summary.get("trial_count") is not None:
+                    summary_parts.append(f"trials: {evidence_summary.get('trial_count')}")
+                if evidence_summary.get("article_count") is not None:
+                    summary_parts.append(f"articles: {evidence_summary.get('article_count')}")
+                if evidence_summary.get("patent_count") is not None:
+                    summary_parts.append(f"patents: {evidence_summary.get('patent_count')}")
+                latest_phase = evidence_summary.get("latest_trial_phase")
+                if latest_phase:
+                    summary_parts.append(f"latest trial phase: {latest_phase}")
+                if summary_parts:
+                    lines.append(f"**Evidence summary:** {', '.join(summary_parts)}")
 
             # Commercial line
             annual_revenue = getattr(result, "annual_revenue_usd_millions", None)

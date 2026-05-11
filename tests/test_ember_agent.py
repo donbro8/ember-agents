@@ -9,7 +9,14 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ember_agents.agent import EmberAgent, PipelineOutput, _candidate_to_result, _signals_to_dict, _spec_to_classifications
+from ember_agents.agent import (
+    EmberAgent,
+    PipelineOutput,
+    _candidate_to_result,
+    _expected_dimensions_from_spec,
+    _signals_to_dict,
+    _spec_to_classifications,
+)
 from ember_agents.render import ResultRenderer
 from ember_agents.search.classify import ClassificationOrchestrator, ClassificationResult
 from ember_agents.synthesis import ResultSynthesizer, SynthesisOutput
@@ -64,6 +71,10 @@ class FakeSearchSpec:
     modality: object = None
     resolved_terms: list = field(default_factory=list)
     pending_disambiguations: list = field(default_factory=list)
+    cell_line_class: str | None = None
+    min_revenue_millions: float | None = None
+    patent_expiry_window: object = None
+    jurisdictions: list = field(default_factory=list)
     max_results: int = 500
     domains: list = field(default_factory=lambda: ["trials", "patents", "articles", "candidates"])
 
@@ -627,6 +638,86 @@ class TestHelpers:
         spec = FakeSearchSpec()
         classifications = _spec_to_classifications(spec)
         assert classifications == {}
+
+    def test_expected_dimensions_from_spec_includes_opportunity_dims(self):
+        spec = FakeSearchSpec(
+            target=object(),
+            therapeutic_area=object(),
+            drug_names=["adalimumab"],
+            indications=["ra"],
+            modality="mab",
+            cell_line_class="mammalian",
+            min_revenue_millions=1000.0,
+            patent_expiry_window={"start": "2026-01-01", "end": "2029-01-01"},
+            jurisdictions=["US"],
+        )
+        dims = _expected_dimensions_from_spec(spec)
+        assert "target" in dims
+        assert "therapeutic_area" in dims
+        assert "drug_name" in dims
+        assert "indication" in dims
+        assert "modality" in dims
+        assert "cell_line_class" in dims
+        assert "revenue" in dims
+        assert "patent_expiry_window" in dims
+        assert "jurisdiction" in dims
+
+    def test_candidate_to_result_includes_explanation_metadata(self):
+        """_candidate_to_result carries additive score/match/suppression metadata."""
+        from ember_agents.agent import _candidate_to_result
+
+        cand = FakeCandidate(drug_name="adalimumab", matched_dimensions=["target"])
+        scored = ScoredCandidate(
+            candidate=cand,
+            semantic_score=0.8,
+            structured_score=0.6,
+            evidence_score=0.4,
+            overall_score=0.62,
+            rank=1,
+            suppressed=True,
+        )
+
+        @dataclass
+        class _Summary:
+            query_type: str = "biosimilar_screen"
+            threshold: float = 0.45
+            total_candidates: int = 2
+            returned_candidates: int = 2
+            suppressed_candidates: int = 1
+
+        result = _candidate_to_result(
+            scored,
+            score_summary=_Summary(),
+            expected_dimensions=["target", "indication", "drug_name"],
+        )
+        match_explanations = getattr(result, "match_explanations", None)
+        matched_dimensions = getattr(result, "matched_dimensions", None)
+        missed_dimensions = getattr(result, "missed_dimensions", None)
+        concrete_labels = getattr(result, "concrete_labels", None)
+        suppression_metadata = getattr(result, "suppression_metadata", None)
+        component_scores = getattr(result, "component_scores", None)
+        evidence_summary = getattr(result, "evidence_summary", None)
+
+        assert isinstance(match_explanations, dict)
+        assert match_explanations["matched_dimensions"] == ["target"]
+        assert "indication" in match_explanations["missed_dimensions"]
+        assert "drug_name" in match_explanations["missed_dimensions"]
+        assert matched_dimensions == ["target"]
+        assert "indication" in missed_dimensions
+        assert "drug_name" in missed_dimensions
+        assert concrete_labels == {"drug_name": ["adalimumab"]}
+
+        assert isinstance(suppression_metadata, dict)
+        assert suppression_metadata["suppressed"] is True
+        assert suppression_metadata["threshold"] == 0.45
+        assert suppression_metadata["query_type"] == "biosimilar_screen"
+
+        assert isinstance(component_scores, dict)
+        assert component_scores["semantic"] == 0.8
+        assert component_scores["overall"] == 0.62
+
+        assert isinstance(evidence_summary, dict)
+        assert evidence_summary["trial_count"] == 0
 
 
 # ---------------------------------------------------------------------------

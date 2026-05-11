@@ -398,6 +398,13 @@ class _ResultStub:
     biosimilar_competitors: list = field(default_factory=list)
     biosimilar_competitor_count: int | None = None
     source_urls: list = field(default_factory=list)
+    component_scores: dict | None = None
+    suppression_metadata: dict | None = None
+    evidence_summary: dict | None = None
+    matched_dimensions: list | None = None
+    missed_dimensions: list | None = None
+    concrete_labels: dict | None = None
+    match_explanations: dict | None = None
 
 
 class TestScoreBreakdown:
@@ -440,6 +447,26 @@ class TestScoreBreakdown:
         )
         output = renderer.render(_make_trace(), [result])
         assert "**Scores:**" not in output
+
+    def test_explanation_and_suppression_metadata_rendered(self):
+        renderer = ResultRenderer()
+        result = _ResultStub(
+            drug_name="Adalimumab",
+            semantic_score=0.85,
+            structured_score=0.72,
+            evidence_score=0.91,
+            suppression_metadata={"threshold": 0.45, "suppressed": False, "query_type": "biosimilar_screen"},
+            matched_dimensions=["target", "indication"],
+            missed_dimensions=["drug_name"],
+            concrete_labels={"target": ["TNF"], "indication": ["rheumatoid arthritis"]},
+            match_explanations={"matched_dimensions": ["target"], "missed_dimensions": []},
+            evidence_summary={"trial_count": 3, "article_count": 2, "patent_count": 1, "latest_trial_phase": "Phase III"},
+        )
+        output = renderer.render(_make_trace(), [result])
+        assert "**Matched dimensions:** Target (TNF), Indication (rheumatoid arthritis)" in output
+        assert "**Missed dimensions:** Drug name" in output
+        assert "**Suppression:** threshold: 0.45, suppressed: no, query type: biosimilar_screen" in output
+        assert "**Evidence summary:** trials: 3, articles: 2, patents: 1, latest trial phase: Phase III" in output
 
 
 class TestPatentUrlColumn:

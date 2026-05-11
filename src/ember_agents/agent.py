@@ -105,7 +105,54 @@ def _extract_target_label(target: Any) -> str | None:
     return None
 
 
-def _candidate_to_result(scored: Any) -> Any:
+def _expected_dimensions_from_spec(spec: Any) -> list[str]:
+    """Return active scoring dimensions inferred from a SearchSpec-like object."""
+    expected: list[str] = []
+    if getattr(spec, "target", None) is not None:
+        expected.append("target")
+    if getattr(spec, "drug_names", None):
+        expected.append("drug_name")
+    if getattr(spec, "indications", None):
+        expected.append("indication")
+    if getattr(spec, "therapeutic_area", None) is not None:
+        expected.append("therapeutic_area")
+    if getattr(spec, "modality", None) is not None:
+        expected.append("modality")
+    if getattr(spec, "cell_line_class", None) is not None:
+        expected.append("cell_line_class")
+    if getattr(spec, "min_revenue_millions", None) is not None:
+        expected.append("revenue")
+    if getattr(spec, "patent_expiry_window", None) is not None:
+        expected.append("patent_expiry_window")
+    if getattr(spec, "jurisdictions", None):
+        expected.append("jurisdiction")
+    return expected
+
+
+def _attach_additive_metadata(result_obj: Any, metadata: dict[str, Any]) -> Any:
+    """Attach additive metadata while remaining compatible with strict models."""
+    obj = result_obj
+    for key, value in metadata.items():
+        try:
+            setattr(obj, key, value)
+            continue
+        except Exception:  # noqa: BLE001
+            pass
+        model_copy = getattr(obj, "model_copy", None)
+        if callable(model_copy):
+            try:
+                obj = model_copy(update={key: value})
+            except Exception:  # noqa: BLE001
+                pass
+    return obj
+
+
+def _candidate_to_result(
+    scored: Any,
+    *,
+    score_summary: Any | None = None,
+    expected_dimensions: list[str] | None = None,
+) -> Any:
     """Convert a ScoredCandidate to a CandidateResult.
 
     Falls back to a plain dict when ``ember_data.models.result`` is not
@@ -222,8 +269,52 @@ def _candidate_to_result(scored: Any) -> Any:
             best_phase_order = phase_num
             latest_trial_phase = phase_str
 
+    matched_dimensions: list[str] = [str(d) for d in (getattr(cand, "matched_dimensions", []) or [])]
+    matched_set = {d.lower() for d in matched_dimensions}
+    expected_dims = [d for d in (expected_dimensions or []) if d]
+    missed_dimensions = [d for d in expected_dims if d.lower() not in matched_set]
+    concrete_labels: dict[str, list[str]] = {}
+    if target_label:
+        concrete_labels["target"] = [target_label]
+    if drug_name:
+        concrete_labels["drug_name"] = [drug_name]
+    if indication:
+        concrete_labels["indication"] = [str(v) for v in indication if v]
+    therapeutic_area = getattr(cand, "therapeutic_area", None)
+    therapeutic_area_label = _extract_target_label(therapeutic_area)
+    if therapeutic_area_label:
+        concrete_labels["therapeutic_area"] = [therapeutic_area_label]
+    if modality:
+        concrete_labels["modality"] = [modality]
+
+    threshold = getattr(score_summary, "threshold", None)
+    query_type = getattr(score_summary, "query_type", None)
+    suppression_metadata = {
+        "suppressed": bool(getattr(scored, "suppressed", False)),
+        "threshold": threshold,
+        "query_type": query_type,
+        "suppressed_candidates": getattr(score_summary, "suppressed_candidates", None),
+        "total_candidates": getattr(score_summary, "total_candidates", None),
+    }
+    component_scores = {
+        "semantic": semantic_score,
+        "structured": structured_score,
+        "evidence": evidence_score,
+        "overall": overall_score,
+    }
+    evidence_summary = {
+        "trial_count": trial_count,
+        "article_count": article_count,
+        "patent_count": len(patent_jurisdictions),
+        "latest_trial_phase": latest_trial_phase,
+    }
+    match_explanations = {
+        "matched_dimensions": matched_dimensions,
+        "missed_dimensions": missed_dimensions,
+    }
+
     if CandidateResult is not None:
-        return CandidateResult(
+        result_obj = CandidateResult(
             drug_name=drug_name,
             fda_generic_name=fda_generic_name,
             target=target_label,
@@ -255,6 +346,18 @@ def _candidate_to_result(scored: Any) -> Any:
             fda_manufacturer=fda_manufacturer,
             fda_therapeutic_area=fda_therapeutic_area,
             indication=indication,
+        )
+        return _attach_additive_metadata(
+            result_obj,
+            {
+                "component_scores": component_scores,
+                "suppression_metadata": suppression_metadata,
+                "evidence_summary": evidence_summary,
+                "matched_dimensions": matched_dimensions,
+                "missed_dimensions": missed_dimensions,
+                "concrete_labels": concrete_labels,
+                "match_explanations": match_explanations,
+            },
         )
 
     # Fallback: a simple namespace so the renderer can still call getattr()
@@ -294,6 +397,13 @@ def _candidate_to_result(scored: Any) -> Any:
     r.fda_brand_name = fda_brand_name  # type: ignore[attr-defined]
     r.fda_manufacturer = fda_manufacturer  # type: ignore[attr-defined]
     r.fda_therapeutic_area = fda_therapeutic_area  # type: ignore[attr-defined]
+    r.component_scores = component_scores  # type: ignore[attr-defined]
+    r.suppression_metadata = suppression_metadata  # type: ignore[attr-defined]
+    r.evidence_summary = evidence_summary  # type: ignore[attr-defined]
+    r.matched_dimensions = matched_dimensions  # type: ignore[attr-defined]
+    r.missed_dimensions = missed_dimensions  # type: ignore[attr-defined]
+    r.concrete_labels = concrete_labels  # type: ignore[attr-defined]
+    r.match_explanations = match_explanations  # type: ignore[attr-defined]
     return r
 
 
@@ -566,7 +676,16 @@ class EmberAgent(Agent):
             scored_candidates = []
 
         # Convert ScoredCandidates to CandidateResult objects
-        candidate_results: list[Any] = [_candidate_to_result(sc) for sc in scored_candidates]
+        score_summary = getattr(self._scorer, "last_score_summary", None)
+        expected_dimensions = _expected_dimensions_from_spec(spec)
+        candidate_results: list[Any] = [
+            _candidate_to_result(
+                sc,
+                score_summary=score_summary,
+                expected_dimensions=expected_dimensions,
+            )
+            for sc in scored_candidates
+        ]
 
         # ----------------------------------------------------------------
         # Phase 6: Render
