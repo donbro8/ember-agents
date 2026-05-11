@@ -141,6 +141,14 @@ def test_query_returns_candidates(query: str) -> None:
 
 
 @pytest.mark.integration
+def test_dir007_biosimilar_query_returns_at_least_five_candidates() -> None:
+    """DIR-007 fixture query should return >= 5 qualifying candidates."""
+    query = "biosimilar opportunities for biologics with revenue over 1 billion"
+    results = _collect_results(query)
+    assert len(results) >= 5, f"Expected >=5 candidates for {query!r}, got {len(results)}"
+
+
+@pytest.mark.integration
 @pytest.mark.parametrize("query", REFERENCE_QUERIES)
 def test_always_required_fields_populated(query: str) -> None:
     """ALWAYS_REQUIRED fields must be populated on every result for every query."""

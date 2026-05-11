@@ -221,6 +221,12 @@ def _build_results() -> None:
             sources=["bigquery_fda", "bigquery_patents"],
             indication=["Crohn's disease"],
         ),
+        _make_drug_result(
+            "adalimumab",
+            score=0.82,
+            sources=["bigquery_fda", "bigquery_patents"],
+            indication=["Rheumatoid arthritis"],
+        ),
     ]
 
     QUERY_RESULTS["HER2 targeting antibodies for breast cancer"] = [
