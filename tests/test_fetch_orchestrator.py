@@ -612,3 +612,108 @@ async def test_fetch_returns_empty_with_no_matching_domains() -> None:
     orch = FetchOrchestrator()
     result = await orch.fetch(spec)
     assert result == []
+
+
+async def test_clinicaltrials_uses_intervention_only_without_condition() -> None:
+    """ClinicalTrials falls back to intervention-only when condition is absent."""
+    trial = _make_trial(interventions=["adalimumab"])
+    prov = _make_provenance("ClinicalTrials.gov")
+    ct_client = _make_ct_client(results=[(trial, prov)])
+    spec = FakeSpec(
+        drug_names=["adalimumab"],
+        indications=[],
+        therapeutic_area=None,
+        domains=["trials"],
+    )
+    orch = _make_orchestrator(ct_client=ct_client)
+    candidates = await orch.fetch(spec)
+
+    assert len(candidates) >= 1
+    ct_client.search.assert_called()
+    _, kwargs = ct_client.search.call_args
+    assert kwargs.get("intervention") == "adalimumab"
+    assert kwargs.get("term") is None
+    assert any(s.name == "clinicaltrials" and s.status == "ok" for s in orch.last_source_statuses)
+
+
+async def test_clinicaltrials_term_fallback_is_capped_and_marked_constrained() -> None:
+    """Broad target term fallback is capped and status marked constrained."""
+    trial = _make_trial(interventions=["drug-x"])
+    prov = _make_provenance("ClinicalTrials.gov")
+    ct_client = _make_ct_client(results=[(trial, prov)])
+
+    @dataclass
+    class _ResolvedTerm:
+        label: str = ""
+        identifier: str = ""
+        value: str = ""
+
+    spec = FakeSpec(
+        target=FakeTargetSpec(label="PD-1", identifier="PDCD1", value="Programmed cell death 1"),
+        indications=[],
+        drug_names=[],
+        resolved_terms=[
+            _ResolvedTerm(label="PD-1"),
+            _ResolvedTerm(label="checkpoint inhibitor"),
+            _ResolvedTerm(label="immuno-oncology"),
+            _ResolvedTerm(label="extra-term"),
+        ],
+        domains=["trials"],
+    )
+    orch = _make_orchestrator(ct_client=ct_client)
+    await orch.fetch(spec)
+
+    term_calls = [
+        c for c in ct_client.search.call_args_list
+        if c.kwargs.get("term")
+    ]
+    assert len(term_calls) == 2
+    ct_statuses = [s for s in orch.last_source_statuses if s.name == "clinicaltrials"]
+    assert ct_statuses
+    assert ct_statuses[-1].status.startswith("ok_constrained")
+
+
+async def test_clinicaltrials_condition_path_not_marked_constrained_when_terms_capped() -> None:
+    """Condition-based query path should not inherit constrained term-fallback status."""
+    trial = _make_trial(interventions=["drug-y"])
+    prov = _make_provenance("ClinicalTrials.gov")
+    ct_client = _make_ct_client(results=[(trial, prov)])
+
+    @dataclass
+    class _ResolvedTerm:
+        label: str = ""
+        identifier: str = ""
+        value: str = ""
+
+    spec = FakeSpec(
+        target=FakeTargetSpec(label="PD-1", identifier="PDCD1", value="Programmed cell death 1"),
+        indications=[FakeIndication()],
+        drug_names=[],
+        resolved_terms=[
+            _ResolvedTerm(label="PD-1"),
+            _ResolvedTerm(label="checkpoint inhibitor"),
+            _ResolvedTerm(label="immuno-oncology"),
+            _ResolvedTerm(label="extra-term"),
+        ],
+        domains=["trials"],
+    )
+    orch = _make_orchestrator(ct_client=ct_client)
+    await orch.fetch(spec)
+
+    term_calls = [c for c in ct_client.search.call_args_list if c.kwargs.get("term")]
+    assert len(term_calls) == 0
+    ct_statuses = [s for s in orch.last_source_statuses if s.name == "clinicaltrials"]
+    assert ct_statuses
+    assert ct_statuses[-1].status == "ok"
+
+
+async def test_clinicaltrials_skipped_status_recorded() -> None:
+    """ClinicalTrials records skipped status when trials domain is not requested."""
+    ct_client = _make_ct_client(results=[])
+    spec = FakeSpec(drug_names=["adalimumab"], domains=["articles"])
+    orch = _make_orchestrator(ct_client=ct_client)
+    await orch.fetch(spec)
+    assert any(
+        s.name == "clinicaltrials" and s.status == "skipped" and s.result_count == 0
+        for s in orch.last_source_statuses
+    )

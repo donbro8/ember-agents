@@ -384,6 +384,21 @@ class TestTraceOutput:
         assert "fetch_orchestrator" in output or "biologic_seed" in output
 
     @pytest.mark.asyncio
+    async def test_trace_includes_fetcher_source_statuses(self):
+        """Agent trace includes structured statuses exposed by fetcher."""
+        agent = _make_agent(fetch_results=[])
+        agent._fetcher.last_source_statuses = [
+            SourceStatus(name="clinicaltrials", status="empty", result_count=0),
+            SourceStatus(name="pubmed", status="ok", result_count=2),
+        ]
+
+        output = await agent.execute("adalimumab")
+        status_names = [s.name for s in output.trace.source_statuses]
+        assert "fetch_orchestrator" in status_names
+        assert "clinicaltrials" in status_names
+        assert "pubmed" in status_names
+
+    @pytest.mark.asyncio
     async def test_trace_gate_outcome_in_output(self):
         """Output contains gate outcome."""
         agent = _make_agent()

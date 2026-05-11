@@ -524,6 +524,7 @@ class EmberAgent(Agent):
             source_statuses.append(
                 SourceStatus(name="fetch_orchestrator", status="ok", result_count=orch_count)
             )
+            source_statuses.extend(_fetcher_source_statuses(self._fetcher))
         except Exception as exc:  # noqa: BLE001
             yield f"> **Warning** — fetch orchestrator error: {exc}\n"
             candidates = []
@@ -719,6 +720,7 @@ class EmberAgent(Agent):
             source_statuses.append(
                 SourceStatus(name="fetch_orchestrator", status="ok", result_count=len(candidates))
             )
+            source_statuses.extend(_fetcher_source_statuses(self._fetcher))
         except Exception:  # noqa: BLE001
             candidates = []
             source_statuses.append(
@@ -863,3 +865,23 @@ def _fetch_result_to_candidate_stub(fetch_result: Any) -> Any:
         fda_manufacturer=getattr(fetch_result, "fda_manufacturer", None) or None,
         fda_therapeutic_area=getattr(fetch_result, "fda_therapeutic_area", None) or None,
     )
+
+
+def _fetcher_source_statuses(fetcher: Any) -> list[SourceStatus]:
+    """Extract structured per-source statuses from a fetcher if available."""
+    raw = getattr(fetcher, "last_source_statuses", None)
+    if not isinstance(raw, list):
+        return []
+    statuses: list[SourceStatus] = []
+    for item in raw:
+        if isinstance(item, SourceStatus):
+            statuses.append(item)
+            continue
+        if not isinstance(item, dict):
+            continue
+        name = item.get("name")
+        status = item.get("status")
+        result_count = item.get("result_count")
+        if isinstance(name, str) and isinstance(status, str) and isinstance(result_count, int):
+            statuses.append(SourceStatus(name=name, status=status, result_count=result_count))
+    return statuses

@@ -19,6 +19,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from ember_agents.trace import SourceStatus
+
 try:
     from ember_data.classification.spec import SearchSpec
     from ember_data.models.article import Article
@@ -377,6 +379,7 @@ class FetchOrchestrator:
                 self._pubmed = None
         else:
             self._pubmed = None
+        self.last_source_statuses: list[SourceStatus] = []
 
     # ------------------------------------------------------------------
     # Public API
@@ -398,12 +401,20 @@ class FetchOrchestrator:
         """
         max_results: int = getattr(spec, "max_results", 500)
         per_source_limit = min(max_results, 100)
+        self.last_source_statuses = []
 
         raw_results: list[FetchResult] = []
 
         # --- Wave 1: BigQuery (serial to preserve cost ordering) ---
         bq_results = await self._fetch_bigquery(spec, per_source_limit)
         raw_results.extend(bq_results)
+        self.last_source_statuses.append(
+            SourceStatus(
+                name="bigquery",
+                status="ok" if bq_results else "empty",
+                result_count=len(bq_results),
+            )
+        )
 
         # --- Wave 2: External APIs (concurrent) ---
         ext_tasks = [
@@ -412,9 +423,22 @@ class FetchOrchestrator:
             self._fetch_pubmed(spec, per_source_limit),
         ]
         ext_results_lists = await asyncio.gather(*ext_tasks, return_exceptions=True)
-        for result in ext_results_lists:
+        ext_source_names = ["clinicaltrials", "uniprot", "pubmed"]
+        for idx, result in enumerate(ext_results_lists):
             if isinstance(result, list):
                 raw_results.extend(result)
+                if ext_source_names[idx] != "clinicaltrials":
+                    self.last_source_statuses.append(
+                        SourceStatus(
+                            name=ext_source_names[idx],
+                            status="ok" if result else "empty",
+                            result_count=len(result),
+                        )
+                    )
+            elif ext_source_names[idx] != "clinicaltrials":
+                self.last_source_statuses.append(
+                    SourceStatus(name=ext_source_names[idx], status="error", result_count=0)
+                )
             # Exceptions from individual sources are silently dropped so that
             # partial results are still returned.
 
@@ -503,51 +527,144 @@ class FetchOrchestrator:
 
         domains = getattr(spec, "domains", ["trials", "patents", "articles", "candidates"])
         if "trials" not in domains:
+            self.last_source_statuses.append(
+                SourceStatus(name="clinicaltrials", status="skipped", result_count=0)
+            )
             return results
 
         if self._ct is None:
+            self.last_source_statuses.append(
+                SourceStatus(name="clinicaltrials", status="skipped", result_count=0)
+            )
             return results
 
         condition = self._extract_condition_label(spec)
-        if not condition:
-            return results
 
         intervention: str | None = None
         drug_names: list[str] = list(getattr(spec, "drug_names", []) or [])
         if drug_names:
             intervention = drug_names[0]
+        term_queries, constrained = self._extract_target_term_queries(spec, max_terms=2)
 
         approval_window = getattr(spec, "approval_date_range", None)
         from_date = getattr(approval_window, "start", None) if approval_window else None
         to_date = getattr(approval_window, "end", None) if approval_window else None
 
-        loop = asyncio.get_event_loop()
-        try:
-            ct_results: list[tuple] = await loop.run_in_executor(
-                None,
-                lambda: self._ct.search(
-                    condition,
-                    intervention=intervention,
-                    from_date=from_date,
-                    to_date=to_date,
-                    max_results=limit,
-                ),
+        query_specs: list[dict[str, Any]] = []
+        if condition:
+            query_specs.append(
+                {
+                    "condition": condition,
+                    "intervention": intervention,
+                    "term": None,
+                }
             )
-        except Exception:  # noqa: BLE001
+        elif intervention:
+            query_specs.append(
+                {
+                    "condition": "",
+                    "intervention": intervention,
+                    "term": None,
+                }
+            )
+
+        if not condition and term_queries:
+            for term in term_queries:
+                query_specs.append(
+                    {
+                        "condition": "",
+                        "intervention": intervention,
+                        "term": term,
+                    }
+                )
+
+        if not query_specs:
+            self.last_source_statuses.append(
+                SourceStatus(name="clinicaltrials", status="skipped", result_count=0)
+            )
             return results
 
-        for trial, provenance in ct_results:
-            fetch_result = FetchResult(
-                drug_name=_extract_first(getattr(trial, "interventions", [])),
-                synonyms=list(getattr(trial, "interventions", []))[1:],
-                target_id="",
-                trials=[trial],
-                provenance=[provenance],
-                matched_dimensions=["indication"],
-            )
-            results.append(fetch_result)
+        loop = asyncio.get_event_loop()
+        had_error = False
+        for query_spec in query_specs:
+            try:
+                ct_results: list[tuple] = await loop.run_in_executor(
+                    None,
+                    lambda qs=query_spec: self._ct.search(
+                        qs["condition"],
+                        intervention=qs["intervention"],
+                        term=qs["term"],
+                        from_date=from_date,
+                        to_date=to_date,
+                        max_results=limit,
+                    ),
+                )
+            except Exception:  # noqa: BLE001
+                had_error = True
+                continue
+
+            for trial, provenance in ct_results:
+                matched_dimensions = ["indication"] if condition else ["drug_name"]
+                if query_spec["term"]:
+                    matched_dimensions = ["target"]
+                fetch_result = FetchResult(
+                    drug_name=_extract_first(getattr(trial, "interventions", [])),
+                    synonyms=list(getattr(trial, "interventions", []))[1:],
+                    target_id="",
+                    trials=[trial],
+                    provenance=[provenance],
+                    matched_dimensions=matched_dimensions,
+                )
+                results.append(fetch_result)
+
+        used_term_fallback = any(qs.get("term") for qs in query_specs)
+
+        if results:
+            status = "ok"
+        elif had_error:
+            status = "error"
+        else:
+            status = "empty"
+        if constrained and used_term_fallback and status == "ok":
+            status = "ok_constrained"
+        elif constrained and used_term_fallback and status == "empty":
+            status = "empty_constrained"
+        elif constrained and used_term_fallback and status == "error":
+            status = "error_constrained"
+        self.last_source_statuses.append(
+            SourceStatus(name="clinicaltrials", status=status, result_count=len(results))
+        )
 
         return results
+
+    def _extract_target_term_queries(self, spec: SearchSpec, *, max_terms: int) -> tuple[list[str], bool]:
+        """Return target/mechanism fallback terms and whether truncation was applied."""
+        all_terms: list[str] = []
+        target = getattr(spec, "target", None)
+        if target is not None:
+            for value in (
+                getattr(target, "label", None),
+                getattr(target, "identifier", None),
+                getattr(target, "value", None),
+            ):
+                if value:
+                    term = str(value).strip()
+                    if term and term not in all_terms:
+                        all_terms.append(term)
+
+        for term_obj in getattr(spec, "resolved_terms", []) or []:
+            for value in (
+                getattr(term_obj, "label", None),
+                getattr(term_obj, "identifier", None),
+                getattr(term_obj, "value", None),
+            ):
+                if value:
+                    term = str(value).strip()
+                    if term and term not in all_terms:
+                        all_terms.append(term)
+
+        constrained = len(all_terms) > max_terms
+        return all_terms[:max_terms], constrained
 
     async def _fetch_uniprot(
         self, spec: SearchSpec, limit: int
